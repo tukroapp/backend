@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO community_member (community_id, user_id, role)\n        VALUES ($1, $2, 'owner')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1e4372e2d96702f2082da56bc901a0060c9a17cbb57fc164ceb9f389b76e9474"
+}

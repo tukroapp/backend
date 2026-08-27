@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO activity\n            (actor_id, kind, target_user_id, community_id, media_id, testimonial_id, text_value)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "activity_kind",
+            "kind": {
+              "Enum": [
+                "testimonial_received",
+                "community_joined",
+                "community_created",
+                "became_fan",
+                "friendship_made",
+                "media_added",
+                "status_changed"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fe908a428e19079f7092c8254dac3f98b495b7cb99fa3666a0dece688ff4fc3b"
+}

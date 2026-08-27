@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_profile\n        SET avatar_url = $1\n        WHERE user_id = $2\n        RETURNING (SELECT avatar_url FROM user_profile WHERE user_id = $2) AS previous\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "previous",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e5c907ed8bbc8515b1ec2c1d9b848dbc0ef6535af9c8909a38fd7d469dd35d8c"
+}

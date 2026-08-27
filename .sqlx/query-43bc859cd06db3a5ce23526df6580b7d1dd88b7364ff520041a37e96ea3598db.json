@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            o.poll_id,\n            o.id,\n            o.position,\n            o.text,\n            COUNT(v.user_id) AS \"votes!\",\n            COALESCE(BOOL_OR(v.user_id = $2::uuid), FALSE) AS \"mine!\"\n        FROM community_poll_option o\n        LEFT JOIN community_poll_vote v ON v.option_id = o.id\n        WHERE o.poll_id = ANY($1)\n        GROUP BY o.poll_id, o.id, o.position, o.text\n        ORDER BY o.poll_id, o.position\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "poll_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community_poll_option",
+            "name": "poll_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community_poll_option",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "position",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "community_poll_option",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_poll_option",
+            "name": "text"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "votes!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "mine!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "43bc859cd06db3a5ce23526df6580b7d1dd88b7364ff520041a37e96ea3598db"
+}

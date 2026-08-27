@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE community_join_request\n        SET status = 'rejected', responded_at = NOW()\n        WHERE id = $1 AND community_id = $2 AND status = 'pending'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7a1bd9af58a8073e709a2a7f4a66a9fd04b5d42a7a1920607097c9ed5b4acf1"
+}

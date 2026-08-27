@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE conversation_participant\n        SET hidden_at = NOW()\n        WHERE conversation_id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d4b6b74364ebfcc82fb8d1596be19f4ad70afe01ea4e584bdccfe02a620c3463"
+}

@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            EXISTS (\n                SELECT 1 FROM friend\n                WHERE user_id = $1 AND friend_id = $2\n            ) AS \"is_friend!\",\n            EXISTS (\n                SELECT 1 FROM friend_request\n                WHERE status = 'pending'\n                  AND requester_id = $1 AND addressee_id = $2\n            ) AS \"has_outgoing!\",\n            (\n                SELECT id FROM friend_request\n                WHERE status = 'pending'\n                  AND requester_id = $2 AND addressee_id = $1\n                LIMIT 1\n            ) AS incoming_id,\n            EXISTS (\n                SELECT 1 FROM block\n                WHERE (blocker_id = $1 AND blocked_id = $2)\n                   OR (blocker_id = $2 AND blocked_id = $1)\n            ) AS \"is_blocked!\",\n            (SELECT COUNT(*) FROM friend WHERE user_id = $1) AS \"own_friends!\",\n            (SELECT COUNT(*) FROM friend WHERE user_id = $2) AS \"target_friends!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_friend!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "has_outgoing!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "incoming_id",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "is_blocked!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "own_friends!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "target_friends!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f78d85b37d7b0b0484fcb04a61abcbf6f06477aa349ca0ee040008bdbf7113bc"
+}

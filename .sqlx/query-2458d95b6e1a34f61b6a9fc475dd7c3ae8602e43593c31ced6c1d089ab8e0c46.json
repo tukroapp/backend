@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO notification (user_id, actor_id, kind, scrap_id, testimonial_id, friend_request_id, community_id, topic_id, comment_id)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "notification_kind",
+            "kind": {
+              "Enum": [
+                "friend_request",
+                "friend_accepted",
+                "scrap_received",
+                "scrap_reply",
+                "testimonial_received",
+                "testimonial_accepted",
+                "community_join_request",
+                "community_join_accepted",
+                "topic_comment",
+                "topic_reply"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2458d95b6e1a34f61b6a9fc475dd7c3ae8602e43593c31ced6c1d089ab8e0c46"
+}

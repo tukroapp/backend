@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO community_poll (community_id, author_id, question, min_choices, max_choices, closes_at)\n        VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '24 hours')\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int2",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "73d9f2f0b7c101d00057d7d6f697862c059c703a46ec6debd59ed8373c9437f4"
+}

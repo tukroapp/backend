@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE community_member\n        SET role = 'admin'\n        WHERE community_id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a16cb1d6642ed039073edade36325aa79f56abd394aa736dfc2fd2d1644eab08"
+}

@@ -1,0 +1,138 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE email_queue\n            SET scheduled_at = NOW() + ($1 || ' minutes')::INTERVAL\n            WHERE id IN (\n                SELECT id\n                FROM email_queue\n                WHERE attempts < $2\n                  AND scheduled_at <= NOW()\n                ORDER BY scheduled_at\n                LIMIT $3\n                FOR UPDATE SKIP LOCKED\n            )\n            RETURNING id, from_address, to_address, cc, bcc, subject,\n                      html_content, text_content, attempts, created_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "from_address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "from_address"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "to_address",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "to_address"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "cc",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "cc"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "bcc",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "bcc"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "html_content",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "html_content"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "text_content",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "text_content"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "attempts",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "email_queue",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int2",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ca3bae195abca0c65497092b6c308d74439eb6c9f6a744f49a377bf4cd824460"
+}

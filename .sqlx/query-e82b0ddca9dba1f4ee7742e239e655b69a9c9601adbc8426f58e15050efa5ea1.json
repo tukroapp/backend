@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE auth_user\n        SET status = 'active',\n            status_reason = NULL,\n            suspended_until = NULL,\n            status_changed_at = NOW(),\n            status_changed_by = NULL\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e82b0ddca9dba1f4ee7742e239e655b69a9c9601adbc8426f58e15050efa5ea1"
+}

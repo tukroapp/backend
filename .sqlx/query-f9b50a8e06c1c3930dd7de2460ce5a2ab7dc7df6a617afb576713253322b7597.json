@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM friend_request\n        WHERE status = 'pending'\n          AND ((requester_id = $1 AND addressee_id = $2)\n            OR (requester_id = $2 AND addressee_id = $1))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9b50a8e06c1c3930dd7de2460ce5a2ab7dc7df6a617afb576713253322b7597"
+}

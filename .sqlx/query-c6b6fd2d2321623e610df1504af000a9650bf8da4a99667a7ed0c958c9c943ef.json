@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH RECURSIVE roots AS (\n            SELECT\n                c.id,\n                c.topic_id,\n                c.parent_id,\n                c.body,\n                c.created_at,\n                c.edited_at,\n                c.deleted_at,\n                c.author_id,\n                0 AS depth,\n                ARRAY[c.id] AS path\n            FROM community_topic_comment c\n            WHERE c.topic_id = $1\n              AND c.parent_id IS NOT DISTINCT FROM $2::uuid\n              AND ($3::uuid IS NULL OR c.id > $3::uuid)\n            ORDER BY c.id\n            LIMIT $4\n        ),\n        comment_tree AS (\n            SELECT * FROM roots\n            UNION ALL\n            SELECT\n                c.id,\n                c.topic_id,\n                c.parent_id,\n                c.body,\n                c.created_at,\n                c.edited_at,\n                c.deleted_at,\n                c.author_id,\n                ct.depth + 1,\n                ct.path || c.id\n            FROM community_topic_comment c\n            INNER JOIN comment_tree ct ON c.parent_id = ct.id\n            WHERE ct.depth < $5\n        )\n        SELECT\n            ct.id AS \"id!\",\n            ct.topic_id AS \"topic_id!\",\n            ct.parent_id,\n            ct.depth AS \"depth!\",\n            ct.body AS \"body!\",\n            ct.created_at AS \"created_at!\",\n            ct.edited_at,\n            ct.deleted_at,\n            up.user_id AS author_id,\n            up.slug AS author_slug,\n            up.name AS author_name,\n            up.avatar_url AS author_avatar_url,\n            up.status AS author_status\n        FROM comment_tree ct\n        INNER JOIN user_profile up ON up.user_id = ct.author_id\n        ORDER BY ct.path\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "topic_id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "parent_id",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "depth!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "body!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "edited_at",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "author_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "author_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "author_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "author_avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "author_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "c6b6fd2d2321623e610df1504af000a9650bf8da4a99667a7ed0c958c9c943ef"
+}

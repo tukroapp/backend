@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE community_poll\n            SET question = $1, min_choices = $2, max_choices = $3, edited_at = NOW()\n            WHERE id = $4\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int2",
+        "Int2",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "297f1f0282a979a732a77d21a060154c0aa21a89ee9ca9e6df6a40e7fd144ed3"
+}

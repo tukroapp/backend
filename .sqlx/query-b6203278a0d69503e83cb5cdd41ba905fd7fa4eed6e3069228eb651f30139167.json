@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH ins AS (\n            INSERT INTO conversation (user_lo, user_hi)\n            VALUES ($1, $2)\n            ON CONFLICT (user_lo, user_hi) DO NOTHING\n            RETURNING id\n        )\n        SELECT id AS \"id!\" FROM ins\n        UNION\n        SELECT id FROM conversation WHERE user_lo = $1 AND user_hi = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b6203278a0d69503e83cb5cdd41ba905fd7fa4eed6e3069228eb651f30139167"
+}

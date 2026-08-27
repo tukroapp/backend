@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            (\n                SELECT COUNT(*) FROM notification n\n                LEFT JOIN scrap s ON s.id = n.scrap_id\n                LEFT JOIN testimonial t ON t.id = n.testimonial_id\n                WHERE n.user_id = $1\n                  AND n.read_at IS NULL\n                  AND s.deleted_at IS NULL\n                  AND t.deleted_at IS NULL\n                  AND NOT EXISTS (\n                      SELECT 1 FROM block b\n                      WHERE (b.blocker_id = n.user_id AND b.blocked_id = n.actor_id)\n                         OR (b.blocker_id = n.actor_id AND b.blocked_id = n.user_id)\n                  )\n            ) AS \"notifications!\",\n            (\n                SELECT COUNT(*) FROM message m\n                INNER JOIN conversation_participant cp\n                    ON cp.conversation_id = m.conversation_id AND cp.user_id = $1\n                WHERE m.sender_id <> $1\n                  AND m.created_at > cp.last_read_at\n                  AND (cp.hidden_at IS NULL OR m.created_at > cp.hidden_at)\n            ) AS \"messages!\",\n            (\n                SELECT COUNT(*) FROM activity a\n                INNER JOIN auth_user au ON au.id = a.actor_id AND au.status = 'active'\n                INNER JOIN user_profile ap ON ap.user_id = a.actor_id\n                WHERE a.actor_id <> $1\n                  AND a.created_at > (SELECT feed_seen_at FROM user_profile WHERE user_id = $1)\n                  AND (\n                      (EXISTS (SELECT 1 FROM friend f WHERE f.user_id = $1 AND f.friend_id = a.actor_id)\n                          AND ap.profile_visibility <> 'nobody')\n                      OR (EXISTS (SELECT 1 FROM fan WHERE fan.fan_id = $1 AND fan.idol_id = a.actor_id)\n                          AND ap.profile_visibility = 'everyone')\n                  )\n            ) AS \"feed!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "notifications!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "messages!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "feed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f517e0c83058551b25f7a73af6825612d1578f214aadbb9ea370f97b669aeb67"
+}

@@ -1,0 +1,167 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            t.title,\n            t.body,\n            t.is_pinned,\n            t.is_locked,\n            t.created_at,\n            t.edited_at,\n            t.last_activity_at,\n            up.user_id AS author_id,\n            up.slug AS author_slug,\n            up.name AS author_name,\n            up.avatar_url AS author_avatar_url,\n            up.status AS author_status,\n            (\n                SELECT COUNT(*) FROM community_topic_comment tc\n                WHERE tc.topic_id = t.id AND tc.deleted_at IS NULL\n            ) AS \"comment_count!\"\n        FROM community_topic t\n        INNER JOIN user_profile up ON up.user_id = t.author_id\n        WHERE t.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_pinned",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "is_pinned"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "is_locked",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "is_locked"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "edited_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "edited_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "last_activity_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "last_activity_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "author_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "author_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "author_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "author_avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "author_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "comment_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "01708d1e7ff5d4f29acd3f36dfd9ac5302d16591910213d063b525ca87899bbe"
+}

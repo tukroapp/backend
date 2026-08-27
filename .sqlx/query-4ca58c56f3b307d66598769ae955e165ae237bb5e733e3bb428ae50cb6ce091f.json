@@ -1,0 +1,145 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH updated AS (\n            UPDATE testimonial\n            SET body = $1, status = 'pending', responded_at = NULL\n            WHERE id = $2 AND author_id = $3 AND deleted_at IS NULL\n            RETURNING id, body, status, created_at, updated_at, responded_at, profile_id\n        )\n        SELECT\n            u.id,\n            u.body,\n            u.status::TEXT AS \"status!\",\n            u.created_at,\n            u.updated_at,\n            u.responded_at,\n            up.user_id AS profile_id,\n            up.slug AS profile_slug,\n            up.name AS profile_name,\n            up.avatar_url AS profile_avatar_url,\n            up.status AS profile_status\n        FROM updated u\n        INNER JOIN user_profile up ON up.user_id = u.profile_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "responded_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "responded_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "profile_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "profile_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "profile_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "profile_avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "profile_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4ca58c56f3b307d66598769ae955e165ae237bb5e733e3bb428ae50cb6ce091f"
+}

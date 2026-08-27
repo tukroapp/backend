@@ -1,0 +1,301 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            au.id,\n            au.email AS \"email!: String\",\n            au.is_email_verified,\n            au.is_superuser,\n            (au.google_id IS NOT NULL) AS \"is_google!\",\n            up.slug,\n            up.name,\n            up.avatar_url,\n            up.status,\n            up.bio,\n            up.city,\n            up.birthdate,\n            up.profile_visibility AS \"profile_visibility: Visibility\",\n            up.scrap_read AS \"scrap_read: Visibility\",\n            up.scrap_write AS \"scrap_write: Visibility\",\n            up.testimonial_write AS \"testimonial_write: Visibility\",\n            up.message_receive AS \"message_receive: Visibility\",\n            up.show_profile_visits,\n            (\n                SELECT COUNT(*) FROM notification n\n                LEFT JOIN scrap s ON s.id = n.scrap_id\n                LEFT JOIN testimonial t ON t.id = n.testimonial_id\n                WHERE n.user_id = au.id\n                  AND n.read_at IS NULL\n                  AND s.deleted_at IS NULL\n                  AND t.deleted_at IS NULL\n                  AND NOT EXISTS (\n                      SELECT 1 FROM block b\n                      WHERE (b.blocker_id = n.user_id AND b.blocked_id = n.actor_id)\n                         OR (b.blocker_id = n.actor_id AND b.blocked_id = n.user_id)\n                  )\n            ) AS \"unread_notifications_count!\",\n            (\n                SELECT COUNT(*) FROM message m\n                INNER JOIN conversation_participant cp\n                    ON cp.conversation_id = m.conversation_id AND cp.user_id = au.id\n                WHERE m.sender_id <> au.id\n                  AND m.created_at > cp.last_read_at\n                  AND (cp.hidden_at IS NULL OR m.created_at > cp.hidden_at)\n            ) AS \"unread_messages_count!\"\n        FROM auth_user au\n        INNER JOIN user_profile up ON up.user_id = au.id\n        WHERE au.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email!: String",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_email_verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "is_email_verified"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "is_superuser",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "is_superuser"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "is_google!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "bio",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "bio"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "city",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "birthdate",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "birthdate"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "profile_visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "profile_visibility"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "scrap_read: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "scrap_read"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "scrap_write: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "scrap_write"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "testimonial_write: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "testimonial_write"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "message_receive: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "message_receive"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "show_profile_visits",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "show_profile_visits"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "unread_notifications_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 19,
+        "name": "unread_messages_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "8cd79139434dbb8b624629aac690899b8811d115acd3e936493a4d8d33ff54f7"
+}

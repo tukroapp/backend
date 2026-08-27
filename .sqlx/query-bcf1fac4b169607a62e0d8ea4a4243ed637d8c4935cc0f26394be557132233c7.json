@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO email_queue (\n                from_address,\n                to_address,\n                cc,\n                bcc,\n                subject,\n                html_content,\n                text_content\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bcf1fac4b169607a62e0d8ea4a4243ed637d8c4935cc0f26394be557132233c7"
+}

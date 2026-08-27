@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT is_superuser FROM auth_user WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_superuser",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "is_superuser"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e79279fc5517cc0201e5e6b00b4c07372a77aeac961f378ddafad6d22e23d38c"
+}

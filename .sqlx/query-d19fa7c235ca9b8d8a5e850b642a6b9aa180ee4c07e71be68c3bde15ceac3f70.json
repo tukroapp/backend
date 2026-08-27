@@ -1,0 +1,141 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            c.id,\n            c.last_message_at,\n            lm.body AS last_body,\n            (lm.sender_id = $1) AS \"last_from_me!\",\n            lm.created_at AS last_created_at,\n            other.user_id AS counterpart_id,\n            other.slug AS counterpart_slug,\n            other.name AS counterpart_name,\n            other.avatar_url AS counterpart_avatar_url,\n            other.status AS counterpart_status,\n            (\n                SELECT COUNT(*) FROM message m\n                WHERE m.conversation_id = c.id\n                  AND m.sender_id <> $1\n                  AND m.created_at > cp.last_read_at\n            ) AS \"unread_count!\"\n        FROM conversation_participant cp\n        INNER JOIN conversation c ON c.id = cp.conversation_id\n        INNER JOIN message lm ON lm.id = c.last_message_id\n        INNER JOIN user_profile other\n            ON other.user_id = CASE WHEN c.user_lo = $1 THEN c.user_hi ELSE c.user_lo END\n        INNER JOIN auth_user au ON au.id = other.user_id AND au.status = 'active'\n        WHERE cp.user_id = $1\n          AND (cp.hidden_at IS NULL OR c.last_message_at > cp.hidden_at)\n          AND (\n              $2::timestamptz IS NULL\n              OR (c.last_message_at, c.id) < ($2::timestamptz, $3::uuid)\n          )\n        ORDER BY c.last_message_at DESC, c.id DESC\n        LIMIT $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversation",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "last_message_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversation",
+            "name": "last_message_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "last_body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "message",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_from_me!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "last_created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "message",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "counterpart_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "counterpart_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "counterpart_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "counterpart_avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "counterpart_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "unread_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "d19fa7c235ca9b8d8a5e850b642a6b9aa180ee4c07e71be68c3bde15ceac3f70"
+}

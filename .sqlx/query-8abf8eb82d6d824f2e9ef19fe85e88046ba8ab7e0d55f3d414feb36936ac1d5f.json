@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH target AS (\n            UPDATE scrap\n            SET deleted_at = NOW()\n            WHERE id = $1\n              AND (author_id = $2 OR profile_id = $2)\n              AND deleted_at IS NULL\n            RETURNING id\n        ), replies AS (\n            UPDATE scrap\n            SET deleted_at = NOW()\n            WHERE parent_id = (SELECT id FROM target) AND deleted_at IS NULL\n            RETURNING id\n        )\n        SELECT COUNT(*) AS \"removed!\" FROM target\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "removed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8abf8eb82d6d824f2e9ef19fe85e88046ba8ab7e0d55f3d414feb36936ac1d5f"
+}

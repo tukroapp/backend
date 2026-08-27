@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE testimonial\n        SET status = CASE WHEN $3 THEN 'accepted'::approval_status ELSE 'rejected'::approval_status END,\n            responded_at = NOW()\n        WHERE id = $1 AND profile_id = $2 AND status = 'pending' AND deleted_at IS NULL\n        RETURNING author_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "author_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ae7715ca69a87c9c8149edd5004afb9cdc704a45bc826874fb22c9b4052b4570"
+}

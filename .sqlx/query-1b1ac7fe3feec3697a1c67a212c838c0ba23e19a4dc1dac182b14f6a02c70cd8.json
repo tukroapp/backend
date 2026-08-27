@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id\n            FROM verification_token\n            WHERE token_hash = $1\n                AND kind = 'password_reset'\n                AND expires_at > NOW()\n                AND used_at IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "verification_token",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1b1ac7fe3feec3697a1c67a212c838c0ba23e19a4dc1dac182b14f6a02c70cd8"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO community_poll_option (poll_id, position, text)\n        SELECT $1, (ordinality - 1)::smallint, opt\n        FROM UNNEST($2::text[]) WITH ORDINALITY AS t(opt, ordinality)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fc9aaf9d60685a9d5a9c2d84fe2e7a64f72890ae8b33c7d9a54dc463a5e2e1fd"
+}

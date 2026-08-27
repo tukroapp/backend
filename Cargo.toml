@@ -1,0 +1,98 @@
+[package]
+name = "tukro_backend"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+regex = "1"
+wiremock = { version = "0.6" }
+reqwest = { version = "0.13", features = ["json", "cookies", "multipart"] }
+
+[dependencies]
+actix-web = { version = "4", default-features = false, features = [
+  "macros",
+  "cookies",
+  "http2",
+] }
+actix-cors = "0.7"
+actix-files = "0.6"
+actix-governor = "0.10"
+actix-multipart = "0.8"
+anyhow = "1"
+argon2 = { version = "0.5", features = ["std"] }
+askama = "0.16"
+async-trait = "0.1"
+aws-config = { version = "1.8", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.137.0"
+
+chrono = { version = "0.4", default-features = false, features = [
+  "clock",
+  "serde",
+] }
+
+deadpool-redis = { version = "0.23", features = ["serde"] }
+derive_more = "2"
+dotenvy = "0.15"
+
+futures = "0.3"
+
+hex = "0.4"
+hmac = "0.13"
+html2text = "0.17"
+
+lettre = { version = "0.11", features = ["tokio1-native-tls"] }
+
+mime_guess = "2"
+
+oauth2 = "5"
+
+rand = "0.10"
+reqwest = { version = "0.13", features = ["json"] }
+rust_decimal = { version = "1", features = [
+  "serde-with-str",
+  "serde-with-float",
+] }
+
+serde = { version = "1", features = ["derive"] }
+serde-aux = "4"
+serde_json = "1"
+sha3 = "0.11"
+slugrs = "0.5"
+
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+tracing-actix-web = { version = "0.7", features = ["uuid_v7"] }
+tracing-bunyan-formatter = "0.3"
+
+utoipa = { version = "5", features = [
+  "actix_extras",
+  "chrono",
+  "uuid",
+  "decimal_float",
+] }
+utoipa-actix-web = "0.1"
+utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+validator = { version = "0.20", features = ["derive"] }
+serde_urlencoded = "0.7.1"
+
+[dependencies.sqlx]
+version = "0.9"
+default-features = false
+features = [
+  "runtime-tokio",
+  "macros",
+  "postgres",
+  "uuid",
+  "chrono",
+  "migrate",
+  "rust_decimal",
+  "json",
+]

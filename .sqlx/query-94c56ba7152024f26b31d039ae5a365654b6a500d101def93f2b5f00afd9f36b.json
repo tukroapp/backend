@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO profile_rating (rater_id, rated_id, trusty, cool, sexy)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (rater_id, rated_id) DO UPDATE\n        SET trusty = EXCLUDED.trusty,\n            cool = EXCLUDED.cool,\n            sexy = EXCLUDED.sexy\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int2",
+        "Int2",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "94c56ba7152024f26b31d039ae5a365654b6a500d101def93f2b5f00afd9f36b"
+}

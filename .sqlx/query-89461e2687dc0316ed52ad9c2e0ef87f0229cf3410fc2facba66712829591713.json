@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COUNT(*) FILTER (WHERE pr.trusty > 0) AS \"trusty_count!\",\n            COUNT(*) FILTER (WHERE pr.cool > 0) AS \"cool_count!\",\n            COUNT(*) FILTER (WHERE pr.sexy > 0) AS \"sexy_count!\",\n            AVG(pr.trusty) FILTER (WHERE pr.trusty > 0)::FLOAT8 AS trusty_average,\n            AVG(pr.cool) FILTER (WHERE pr.cool > 0)::FLOAT8 AS cool_average,\n            AVG(pr.sexy) FILTER (WHERE pr.sexy > 0)::FLOAT8 AS sexy_average\n        FROM profile_rating pr\n        INNER JOIN auth_user au ON au.id = pr.rater_id AND au.status = 'active'\n        WHERE pr.rated_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "trusty_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "cool_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "sexy_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "trusty_average",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "cool_average",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "sexy_average",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "89461e2687dc0316ed52ad9c2e0ef87f0229cf3410fc2facba66712829591713"
+}

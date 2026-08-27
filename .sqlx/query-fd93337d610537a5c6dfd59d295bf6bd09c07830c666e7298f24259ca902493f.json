@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO verification_token\n                (user_id, token_hash, kind, expires_at)\n            VALUES\n                ($1, $2, 'password_reset', NOW() + INTERVAL '15 minutes')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fd93337d610537a5c6dfd59d295bf6bd09c07830c666e7298f24259ca902493f"
+}

@@ -1,0 +1,612 @@
+use actix_web::{
+    HttpResponse, Responder,
+    web::{Data, Path, Query},
+};
+use chrono::{DateTime, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use std::sync::Arc;
+
+use crate::{
+    routes::profile::ProfileSummary,
+    services::{
+        auth::{AccountStatus, SessionData},
+        storage::{StorageService, public_url_of},
+    },
+    utils::{
+        ApiCursorPaginatedResponse, ApiErrorResponse, ApiResponse, CursorPaginationQuery, db_err,
+        invalid_field, take_page,
+    },
+};
+
+/// Quantos itens recentes do usuário denunciado o detalhe carrega. É material
+/// de conferência, não listagem: se o moderador precisar de mais, abre o perfil.
+const RECENT_LIMIT: i64 = 10;
+
+#[derive(Serialize, ToSchema)]
+pub struct ReportListItem {
+    pub id: Uuid,
+    pub reason: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub reporter: ProfileSummary,
+    /// `null` quando a denúncia não é de perfil, o que hoje não acontece.
+    pub reported: Option<ProfileSummary>,
+}
+
+/// A conta denunciada vista pela moderação, sem filtro de privacidade: é o
+/// ponto do painel.
+#[derive(Serialize, ToSchema)]
+pub struct ReportedUser {
+    pub id: Uuid,
+    pub email: String,
+    pub account_status: AccountStatus,
+    /// Preenchido só em conta suspensa com prazo. `null` em suspensão
+    /// permanente.
+    pub suspended_until: Option<DateTime<Utc>>,
+    pub is_email_verified: bool,
+    pub registered_at: DateTime<Utc>,
+    pub slug: String,
+    pub name: String,
+    pub avatar_url: Option<String>,
+    pub status: Option<String>,
+    pub bio: Option<String>,
+    pub city: Option<String>,
+    pub birthdate: Option<NaiveDate>,
+    pub friends_count: i64,
+    /// Recados que essa conta escreveu, no mural de qualquer pessoa.
+    pub scraps_written_count: i64,
+    /// Recados que essa conta recebeu no próprio mural.
+    pub scraps_received_count: i64,
+    pub testimonials_written_count: i64,
+    /// Quantas pessoas já bloquearam essa conta. Sinal forte de abuso.
+    pub blocked_by_count: i64,
+    /// Denúncias contra essa conta, incluindo a que está sendo vista.
+    pub reports_count: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct RecentScrap {
+    pub id: Uuid,
+    pub body: String,
+    pub created_at: DateTime<Utc>,
+    /// Dono do mural onde o recado foi escrito.
+    pub wall_slug: String,
+    pub is_reply: bool,
+    /// `true` quando o autor ou o dono do mural apagou. O conteúdo some das
+    /// telas normais e continua aqui: é o ponto do soft delete.
+    pub is_deleted: bool,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct RecentTestimonial {
+    pub id: Uuid,
+    pub body: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    /// Perfil para quem o depoimento foi escrito.
+    pub profile_slug: String,
+    /// `true` quando foi apagado. Continua visível só para a moderação.
+    pub is_deleted: bool,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OtherReport {
+    pub id: Uuid,
+    pub reason: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub reporter_slug: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ReportDetail {
+    pub id: Uuid,
+    pub reason: String,
+    pub details: Option<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub reviewed_at: Option<DateTime<Utc>>,
+    pub reviewed_by: Option<ProfileSummary>,
+    pub reporter: ProfileSummary,
+    pub reported: ReportedUser,
+    /// Últimos recados escritos pela conta denunciada, do mais novo ao mais antigo.
+    pub recent_scraps: Vec<RecentScrap>,
+    /// Últimos depoimentos escritos pela conta denunciada.
+    pub recent_testimonials: Vec<RecentTestimonial>,
+    /// Outras denúncias contra a mesma conta.
+    pub other_reports: Vec<OtherReport>,
+}
+
+/// Fica separado de `CursorPaginationQuery` porque `#[serde(flatten)]` faria o
+/// serde ler todos os valores da query string como texto, quebrando `limit`.
+#[derive(Debug, Deserialize)]
+pub struct QueueQuery {
+    /// Filtra por `open`, `reviewing`, `resolved` ou `dismissed`. Sem filtro,
+    /// vêm todas.
+    pub status: Option<String>,
+}
+
+fn report_not_found() -> HttpResponse {
+    HttpResponse::NotFound().json(ApiErrorResponse::from_single_validation_error(
+        "report",
+        "not_found",
+        Some("Denúncia não encontrada."),
+        vec![],
+    ))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/report",
+    description = "Fila de denúncias para a moderação, da mais nova para a mais antiga",
+    params(
+        ("status" = Option<String>, Query, description = "open, reviewing, resolved ou dismissed"),
+        CursorPaginationQuery,
+    ),
+    responses(
+        (status = 200, description = "Denúncias", body = ApiCursorPaginatedResponse<Vec<ReportListItem>>),
+        (status = 400, description = "Status inválido", body = ApiErrorResponse),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 403, description = "Não é administrador", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Lista a fila de denúncias", skip_all)]
+pub async fn get(
+    query: Query<QueueQuery>,
+    pagination: Query<CursorPaginationQuery>,
+    pool: Data<PgPool>,
+    storage: Data<Arc<dyn StorageService>>,
+) -> Result<impl Responder, actix_web::Error> {
+    if let Some(status) = query.status.as_deref()
+        && !matches!(status, "open" | "reviewing" | "resolved" | "dismissed")
+    {
+        return Ok(invalid_field(
+            "status",
+            "invalid_status",
+            "O status precisa ser 'open', 'reviewing', 'resolved' ou 'dismissed'.",
+        ));
+    }
+
+    let limit = pagination.limit();
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            r.id,
+            r.reason::TEXT AS "reason!",
+            r.status::TEXT AS "status!",
+            r.created_at,
+            reporter.user_id AS reporter_id,
+            reporter.slug AS reporter_slug,
+            reporter.name AS reporter_name,
+            reporter.avatar_url AS reporter_avatar_url,
+            reporter.status AS reporter_status,
+            reported.user_id AS "reported_id?",
+            reported.slug AS "reported_slug?",
+            reported.name AS "reported_name?",
+            reported.avatar_url AS "reported_avatar_url?",
+            reported.status AS "reported_status?"
+        FROM report r
+        INNER JOIN user_profile reporter ON reporter.user_id = r.reporter_id
+        LEFT JOIN user_profile reported ON reported.user_id = r.reported_user_id
+        WHERE ($1::TEXT IS NULL OR r.status::TEXT = $1)
+          AND ($2::uuid IS NULL OR r.id < $2::uuid)
+        ORDER BY r.id DESC
+        LIMIT $3
+        "#,
+        query.status,
+        pagination.cursor_id(),
+        limit + 1,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let storage = storage.as_ref().as_ref();
+    let mut results = rows
+        .into_iter()
+        .map(|row| ReportListItem {
+            id: row.id,
+            reason: row.reason,
+            status: row.status,
+            created_at: row.created_at,
+            reporter: ProfileSummary {
+                id: row.reporter_id,
+                slug: row.reporter_slug,
+                name: row.reporter_name,
+                avatar_url: public_url_of(storage, row.reporter_avatar_url),
+                status: row.reporter_status,
+            },
+            reported: row.reported_id.map(|id| ProfileSummary {
+                id,
+                slug: row.reported_slug.unwrap_or_default(),
+                name: row.reported_name.unwrap_or_default(),
+                avatar_url: public_url_of(storage, row.reported_avatar_url),
+                status: row.reported_status,
+            }),
+        })
+        .collect::<Vec<_>>();
+
+    let next_cursor = take_page(&mut results, limit, |item| item.id.to_string());
+
+    Ok(HttpResponse::Ok().json(ApiCursorPaginatedResponse::new(results, next_cursor)))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/report/{id}",
+    description = "Detalhe de uma denúncia com o histórico recente da conta denunciada, para o moderador conferir sem sair da tela",
+    params(("id" = Uuid, Path, description = "Id da denúncia")),
+    responses(
+        (status = 200, description = "Denúncia detalhada", body = ApiResponse<ReportDetail>),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 403, description = "Não é administrador", body = ApiErrorResponse),
+        (status = 404, description = "Denúncia não encontrada ou sem perfil denunciado", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Detalha uma denúncia", skip_all)]
+pub async fn detail(
+    id: Path<Uuid>,
+    pool: Data<PgPool>,
+    storage: Data<Arc<dyn StorageService>>,
+) -> Result<impl Responder, actix_web::Error> {
+    let id = id.into_inner();
+    let storage = storage.as_ref().as_ref();
+
+    let report = sqlx::query!(
+        r#"
+        SELECT
+            r.id,
+            r.reason::TEXT AS "reason!",
+            r.details,
+            r.status::TEXT AS "status!",
+            r.created_at,
+            r.reviewed_at,
+            r.reported_user_id,
+            reporter.user_id AS reporter_id,
+            reporter.slug AS reporter_slug,
+            reporter.name AS reporter_name,
+            reporter.avatar_url AS reporter_avatar_url,
+            reporter.status AS reporter_status,
+            reviewer.user_id AS "reviewer_id?",
+            reviewer.slug AS "reviewer_slug?",
+            reviewer.name AS "reviewer_name?",
+            reviewer.avatar_url AS "reviewer_avatar_url?",
+            reviewer.status AS "reviewer_status?"
+        FROM report r
+        INNER JOIN user_profile reporter ON reporter.user_id = r.reporter_id
+        LEFT JOIN user_profile reviewer ON reviewer.user_id = r.reviewed_by
+        WHERE r.id = $1
+        "#,
+        id,
+    )
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let Some(report) = report else {
+        return Ok(report_not_found());
+    };
+
+    // Hoje só existe denúncia de perfil. Quando os outros alvos entrarem, cada
+    // um vai querer o seu próprio bloco de contexto.
+    let Some(reported_user_id) = report.reported_user_id else {
+        return Ok(report_not_found());
+    };
+
+    let reported = sqlx::query!(
+        r#"
+        SELECT
+            au.id,
+            au.email AS "email!: String",
+            au.status AS "account_status: AccountStatus",
+            au.suspended_until,
+            au.is_email_verified,
+            au.created_at AS registered_at,
+            up.slug,
+            up.name,
+            up.avatar_url,
+            up.status,
+            up.bio,
+            up.city,
+            up.birthdate,
+            (SELECT COUNT(*) FROM friend f WHERE f.user_id = au.id) AS "friends_count!",
+            (SELECT COUNT(*) FROM scrap s WHERE s.author_id = au.id) AS "scraps_written_count!",
+            (SELECT COUNT(*) FROM scrap s WHERE s.profile_id = au.id) AS "scraps_received_count!",
+            (SELECT COUNT(*) FROM testimonial t WHERE t.author_id = au.id) AS "testimonials_written_count!",
+            (SELECT COUNT(*) FROM block b WHERE b.blocked_id = au.id) AS "blocked_by_count!",
+            (SELECT COUNT(*) FROM report r WHERE r.reported_user_id = au.id) AS "reports_count!"
+        FROM auth_user au
+        INNER JOIN user_profile up ON up.user_id = au.id
+        WHERE au.id = $1
+        "#,
+        reported_user_id,
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let recent_scraps = sqlx::query!(
+        r#"
+        SELECT
+            s.id,
+            s.body,
+            s.created_at,
+            s.parent_id IS NOT NULL AS "is_reply!",
+            s.deleted_at IS NOT NULL AS "is_deleted!",
+            wall.slug AS wall_slug
+        FROM scrap s
+        INNER JOIN user_profile wall ON wall.user_id = s.profile_id
+        WHERE s.author_id = $1
+        ORDER BY s.id DESC
+        LIMIT $2
+        "#,
+        reported_user_id,
+        RECENT_LIMIT,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let recent_testimonials = sqlx::query!(
+        r#"
+        SELECT
+            t.id,
+            t.body,
+            t.status::TEXT AS "status!",
+            t.created_at,
+            t.deleted_at IS NOT NULL AS "is_deleted!",
+            target.slug AS profile_slug
+        FROM testimonial t
+        INNER JOIN user_profile target ON target.user_id = t.profile_id
+        WHERE t.author_id = $1
+        ORDER BY t.id DESC
+        LIMIT $2
+        "#,
+        reported_user_id,
+        RECENT_LIMIT,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let other_reports = sqlx::query!(
+        r#"
+        SELECT
+            r.id,
+            r.reason::TEXT AS "reason!",
+            r.status::TEXT AS "status!",
+            r.created_at,
+            reporter.slug AS reporter_slug
+        FROM report r
+        INNER JOIN user_profile reporter ON reporter.user_id = r.reporter_id
+        WHERE r.reported_user_id = $1 AND r.id <> $2
+        ORDER BY r.id DESC
+        LIMIT $3
+        "#,
+        reported_user_id,
+        id,
+        RECENT_LIMIT,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    Ok(HttpResponse::Ok().json(ApiResponse::new(ReportDetail {
+        id: report.id,
+        reason: report.reason,
+        details: report.details,
+        status: report.status,
+        created_at: report.created_at,
+        reviewed_at: report.reviewed_at,
+        reviewed_by: report.reviewer_id.map(|id| ProfileSummary {
+            id,
+            slug: report.reviewer_slug.unwrap_or_default(),
+            name: report.reviewer_name.unwrap_or_default(),
+            avatar_url: public_url_of(storage, report.reviewer_avatar_url),
+            status: report.reviewer_status,
+        }),
+        reporter: ProfileSummary {
+            id: report.reporter_id,
+            slug: report.reporter_slug,
+            name: report.reporter_name,
+            avatar_url: public_url_of(storage, report.reporter_avatar_url),
+            status: report.reporter_status,
+        },
+        reported: ReportedUser {
+            id: reported.id,
+            email: reported.email,
+            account_status: reported.account_status,
+            suspended_until: reported.suspended_until,
+            is_email_verified: reported.is_email_verified,
+            registered_at: reported.registered_at,
+            slug: reported.slug,
+            name: reported.name,
+            avatar_url: public_url_of(storage, reported.avatar_url),
+            status: reported.status,
+            bio: reported.bio,
+            city: reported.city,
+            birthdate: reported.birthdate,
+            friends_count: reported.friends_count,
+            scraps_written_count: reported.scraps_written_count,
+            scraps_received_count: reported.scraps_received_count,
+            testimonials_written_count: reported.testimonials_written_count,
+            blocked_by_count: reported.blocked_by_count,
+            reports_count: reported.reports_count,
+        },
+        recent_scraps: recent_scraps
+            .into_iter()
+            .map(|row| RecentScrap {
+                id: row.id,
+                body: row.body,
+                created_at: row.created_at,
+                wall_slug: row.wall_slug,
+                is_reply: row.is_reply,
+                is_deleted: row.is_deleted,
+            })
+            .collect(),
+        recent_testimonials: recent_testimonials
+            .into_iter()
+            .map(|row| RecentTestimonial {
+                id: row.id,
+                body: row.body,
+                status: row.status,
+                created_at: row.created_at,
+                profile_slug: row.profile_slug,
+                is_deleted: row.is_deleted,
+            })
+            .collect(),
+        other_reports: other_reports
+            .into_iter()
+            .map(|row| OtherReport {
+                id: row.id,
+                reason: row.reason,
+                status: row.status,
+                created_at: row.created_at,
+                reporter_slug: row.reporter_slug,
+            })
+            .collect(),
+    })))
+}
+
+/// Os estados que o moderador pode gravar. `open` fica de fora: é o inicial e
+/// não se volta para ele.
+#[derive(Debug, Clone, Copy, sqlx::Type)]
+#[sqlx(type_name = "report_status", rename_all = "snake_case")]
+enum ReviewStatus {
+    Reviewing,
+    Resolved,
+    Dismissed,
+}
+
+/// Grava a decisão do moderador. `reviewing` é o estado intermediário e não
+/// carimba `reviewed_at`, que marca a conclusão.
+async fn set_status(
+    pool: &PgPool,
+    id: Uuid,
+    reviewer_id: Uuid,
+    status: ReviewStatus,
+) -> Result<bool, actix_web::Error> {
+    // `reviewed_at` marca a conclusão, então só é carimbado quando a denúncia
+    // sai da fila de análise.
+    let concluded = !matches!(status, ReviewStatus::Reviewing);
+
+    let updated = sqlx::query!(
+        r#"
+        UPDATE report
+        SET status = $3,
+            reviewed_by = $2,
+            reviewed_at = CASE WHEN $4 THEN NOW() ELSE NULL END
+        WHERE id = $1
+        "#,
+        id,
+        reviewer_id,
+        status as ReviewStatus,
+        concluded,
+    )
+    .execute(pool)
+    .await
+    .map_err(db_err)?
+    .rows_affected();
+
+    Ok(updated > 0)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/report/{id}/reviewing",
+    description = "Assume a denúncia para análise, registrando quem está olhando",
+    params(("id" = Uuid, Path, description = "Id da denúncia")),
+    responses(
+        (status = 204, description = "Denúncia em análise"),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 403, description = "Não é administrador", body = ApiErrorResponse),
+        (status = 404, description = "Denúncia não encontrada", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Assume uma denúncia para análise", skip_all)]
+pub async fn reviewing(
+    id: Path<Uuid>,
+    session: SessionData,
+    pool: Data<PgPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    if !set_status(
+        pool.get_ref(),
+        id.into_inner(),
+        session.user_id,
+        ReviewStatus::Reviewing,
+    )
+    .await?
+    {
+        return Ok(report_not_found());
+    }
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/report/{id}/resolve",
+    description = "Encerra a denúncia como procedente, depois de tomada a providência",
+    params(("id" = Uuid, Path, description = "Id da denúncia")),
+    responses(
+        (status = 204, description = "Denúncia resolvida"),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 403, description = "Não é administrador", body = ApiErrorResponse),
+        (status = 404, description = "Denúncia não encontrada", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Resolve uma denúncia", skip_all)]
+pub async fn resolve(
+    id: Path<Uuid>,
+    session: SessionData,
+    pool: Data<PgPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    if !set_status(
+        pool.get_ref(),
+        id.into_inner(),
+        session.user_id,
+        ReviewStatus::Resolved,
+    )
+    .await?
+    {
+        return Ok(report_not_found());
+    }
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/report/{id}/dismiss",
+    description = "Encerra a denúncia como improcedente",
+    params(("id" = Uuid, Path, description = "Id da denúncia")),
+    responses(
+        (status = 204, description = "Denúncia descartada"),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 403, description = "Não é administrador", body = ApiErrorResponse),
+        (status = 404, description = "Denúncia não encontrada", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Descarta uma denúncia", skip_all)]
+pub async fn dismiss(
+    id: Path<Uuid>,
+    session: SessionData,
+    pool: Data<PgPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    if !set_status(
+        pool.get_ref(),
+        id.into_inner(),
+        session.user_id,
+        ReviewStatus::Dismissed,
+    )
+    .await?
+    {
+        return Ok(report_not_found());
+    }
+
+    Ok(HttpResponse::NoContent().finish())
+}

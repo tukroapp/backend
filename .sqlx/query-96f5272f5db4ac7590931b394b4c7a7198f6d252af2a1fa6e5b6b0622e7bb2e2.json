@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO email_log (\n                    from_address, to_address, cc, bcc,\n                    subject, status, attempts, created_at\n                ) VALUES ($1, $2, $3, $4, $5, 'sent', $6, $7)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Text",
+        "Int2",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "96f5272f5db4ac7590931b394b4c7a7198f6d252af2a1fa6e5b6b0622e7bb2e2"
+}

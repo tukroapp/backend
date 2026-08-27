@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE report\n        SET status = $3,\n            reviewed_by = $2,\n            reviewed_at = CASE WHEN $4 THEN NOW() ELSE NULL END\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        {
+          "Custom": {
+            "name": "report_status",
+            "kind": {
+              "Enum": [
+                "open",
+                "reviewing",
+                "resolved",
+                "dismissed"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "567f1fe4f9747e563021a2964c7e6b526e99219e6d88758eeb9d997c489e77ac"
+}

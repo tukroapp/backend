@@ -1,0 +1,25 @@
+{% extends "email/base.html" %}
+{% block title %}
+    Redefina sua senha
+{% endblock %}
+{% block head %}<meta name="token" content="{{ token }}" />{% endblock %}
+{% block content %}
+    <h1>Redefinição de Senha</h1>
+    {% if name != "" %}
+        <p>Prezado(a) {{ name }},</p>
+    {% else %}
+        <p>Prezado(a) Usuário(a),</p>
+    {% endif %}
+    <p>
+        Recebemos uma solicitação para redefinir sua senha. Por favor, clique no link
+        abaixo para definir uma nova senha para sua conta:
+    </p>
+    <p>O link de redefinição de senha é válido por 15 minutos.</p>
+    <p>
+        <a href="{{ frontend_url }}/auth/reset-password?token={{ token }}">Redefinir minha senha</a>
+    </p>
+    <p>
+        Se você não solicitou uma redefinição de senha, por favor, ignore este e-mail,
+        pois sua senha permanecerá inalterada.
+    </p>
+{% endblock %}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE user_profile SET feed_seen_at = NOW() WHERE user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "11cdec4d86ad62ba511b9a85257573354c7d5df3d6a6f29828d3e04f6c1fac61"
+}

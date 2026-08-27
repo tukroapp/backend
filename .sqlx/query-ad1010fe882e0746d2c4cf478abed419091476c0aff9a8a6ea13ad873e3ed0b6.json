@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE community\n        SET avatar_url = $1\n        WHERE id = $2\n        RETURNING (SELECT avatar_url FROM community WHERE id = $2) AS previous\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "previous",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ad1010fe882e0746d2c4cf478abed419091476c0aff9a8a6ea13ad873e3ed0b6"
+}

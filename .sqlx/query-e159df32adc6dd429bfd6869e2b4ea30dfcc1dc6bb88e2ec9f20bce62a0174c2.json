@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE email_queue\n            SET attempts = $1,\n                last_error = $2,\n                scheduled_at = NOW() + ($3 || ' minutes')::INTERVAL\n            WHERE id = $4\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int2",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e159df32adc6dd429bfd6869e2b4ea30dfcc1dc6bb88e2ec9f20bce62a0174c2"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT show_profile_visits FROM user_profile WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "show_profile_visits",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "show_profile_visits"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "255799145879861a0165a07676dcf69af2255e46e2d53bf1cea5580cc33c0d1f"
+}

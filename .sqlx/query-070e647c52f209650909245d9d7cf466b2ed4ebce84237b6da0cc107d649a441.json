@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO community_poll_vote (poll_id, user_id, option_id)\n        SELECT $1, $2, UNNEST($3::uuid[])\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "070e647c52f209650909245d9d7cf466b2ed4ebce84237b6da0cc107d649a441"
+}

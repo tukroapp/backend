@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE friend_request\n        SET status = 'accepted', responded_at = NOW()\n        WHERE id = $1 AND addressee_id = $2 AND status = 'pending'\n        RETURNING requester_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "requester_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "friend_request",
+            "name": "requester_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5512a709ebaadc2c1a09f212d87430759192d36788fad8579d5b10d76182f957"
+}

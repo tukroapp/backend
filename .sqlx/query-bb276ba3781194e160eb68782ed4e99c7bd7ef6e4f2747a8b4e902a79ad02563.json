@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE community_topic\n        SET is_pinned = COALESCE($1, is_pinned),\n            is_locked = COALESCE($2, is_locked)\n        WHERE id = $3\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bool",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb276ba3781194e160eb68782ed4e99c7bd7ef6e4f2747a8b4e902a79ad02563"
+}

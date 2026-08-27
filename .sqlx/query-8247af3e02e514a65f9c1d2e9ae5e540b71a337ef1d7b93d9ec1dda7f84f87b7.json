@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM community_poll_option WHERE poll_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8247af3e02e514a65f9c1d2e9ae5e540b71a337ef1d7b93d9ec1dda7f84f87b7"
+}

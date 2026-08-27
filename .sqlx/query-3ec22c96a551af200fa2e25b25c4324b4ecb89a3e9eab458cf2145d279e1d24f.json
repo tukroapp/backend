@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM fan\n        WHERE (fan_id = $1 AND idol_id = $2)\n           OR (fan_id = $2 AND idol_id = $1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3ec22c96a551af200fa2e25b25c4324b4ecb89a3e9eab458cf2145d279e1d24f"
+}

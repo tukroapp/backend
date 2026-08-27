@@ -1,0 +1,134 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH RECURSIVE chain AS (\n            SELECT\n                c.id,\n                c.topic_id,\n                c.parent_id,\n                c.body,\n                c.created_at,\n                c.edited_at,\n                c.deleted_at,\n                c.author_id,\n                0 AS depth\n            FROM community_topic_comment c\n            WHERE c.id = $1 AND c.topic_id = $2\n            UNION ALL\n            SELECT\n                p.id,\n                p.topic_id,\n                p.parent_id,\n                p.body,\n                p.created_at,\n                p.edited_at,\n                p.deleted_at,\n                p.author_id,\n                ch.depth - 1\n            FROM community_topic_comment p\n            INNER JOIN chain ch ON ch.parent_id = p.id\n            WHERE ch.depth + $3::int > 0\n        )\n        SELECT\n            ch.id AS \"id!\",\n            ch.topic_id AS \"topic_id!\",\n            ch.parent_id,\n            ch.depth AS \"depth!\",\n            ch.body AS \"body!\",\n            ch.created_at AS \"created_at!\",\n            ch.edited_at,\n            ch.deleted_at,\n            up.user_id AS author_id,\n            up.slug AS author_slug,\n            up.name AS author_name,\n            up.avatar_url AS author_avatar_url,\n            up.status AS author_status\n        FROM chain ch\n        INNER JOIN user_profile up ON up.user_id = ch.author_id\n        ORDER BY ch.depth\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "topic_id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "parent_id",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "depth!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "body!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "edited_at",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "author_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "author_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "author_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "author_avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "author_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "85da7ff4918cf0092cf6c954cce04b52ca3258848c15533ef2063db657632ac8"
+}

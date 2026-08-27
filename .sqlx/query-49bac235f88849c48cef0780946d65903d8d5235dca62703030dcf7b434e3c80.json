@@ -1,0 +1,57 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            au.is_email_verified,\n            up.name,\n            au.email AS \"email!: String\"\n        FROM auth_user au\n        INNER JOIN user_profile up ON up.user_id = au.id\n        WHERE au.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_email_verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "is_email_verified"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "email!: String",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "49bac235f88849c48cef0780946d65903d8d5235dca62703030dcf7b434e3c80"
+}

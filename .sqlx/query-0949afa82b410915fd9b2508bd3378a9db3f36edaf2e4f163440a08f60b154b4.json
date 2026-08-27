@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT up.user_id\n        FROM user_profile up\n        INNER JOIN auth_user au ON au.id = up.user_id\n        WHERE up.slug = $1 AND au.status = 'active'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0949afa82b410915fd9b2508bd3378a9db3f36edaf2e4f163440a08f60b154b4"
+}

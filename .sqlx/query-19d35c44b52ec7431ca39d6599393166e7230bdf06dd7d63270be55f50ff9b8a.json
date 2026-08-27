@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM profile_rating\n        WHERE (rater_id = $1 AND rated_id = $2)\n           OR (rater_id = $2 AND rated_id = $1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "19d35c44b52ec7431ca39d6599393166e7230bdf06dd7d63270be55f50ff9b8a"
+}

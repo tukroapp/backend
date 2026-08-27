@@ -1,0 +1,191 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            up.user_id,\n            up.profile_visibility AS \"profile_visibility: Visibility\",\n            up.scrap_read AS \"scrap_read: Visibility\",\n            up.scrap_write AS \"scrap_write: Visibility\",\n            up.testimonial_write AS \"testimonial_write: Visibility\",\n            up.message_receive AS \"message_receive: Visibility\",\n            up.show_profile_visits,\n            COALESCE((\n                SELECT viewer.show_profile_visits\n                FROM user_profile viewer\n                WHERE viewer.user_id = $2::uuid\n            ), TRUE) AS \"viewer_shows_visits!\",\n            EXISTS (\n                SELECT 1 FROM friend f\n                WHERE f.user_id = up.user_id AND f.friend_id = $2::uuid\n            ) AS \"is_friend!\",\n            EXISTS (\n                SELECT 1 FROM fan\n                WHERE fan.idol_id = up.user_id AND fan.fan_id = $2::uuid\n            ) AS \"viewer_is_fan!\",\n            EXISTS (\n                SELECT 1 FROM block b\n                WHERE (b.blocker_id = up.user_id AND b.blocked_id = $2::uuid)\n                   OR (b.blocker_id = $2::uuid AND b.blocked_id = up.user_id)\n            ) AS \"is_blocked!\",\n            (CASE\n                WHEN up.user_id = $2::uuid THEN 'self'\n                WHEN $2::uuid IS NULL THEN 'anonymous'\n                WHEN EXISTS (\n                    SELECT 1 FROM friend f\n                    WHERE f.user_id = up.user_id AND f.friend_id = $2::uuid\n                ) THEN 'friends'\n                WHEN EXISTS (\n                    SELECT 1 FROM friend_request fr\n                    WHERE fr.status = 'pending'\n                      AND fr.requester_id = $2::uuid AND fr.addressee_id = up.user_id\n                ) THEN 'request_sent'\n                WHEN EXISTS (\n                    SELECT 1 FROM friend_request fr\n                    WHERE fr.status = 'pending'\n                      AND fr.requester_id = up.user_id AND fr.addressee_id = $2::uuid\n                ) THEN 'request_received'\n                ELSE 'none'\n            END)::TEXT AS \"relationship!\"\n        FROM user_profile up\n        INNER JOIN auth_user au ON au.id = up.user_id\n        WHERE up.slug = $1 AND au.status = 'active'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "profile_visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "profile_visibility"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "scrap_read: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "scrap_read"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "scrap_write: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "scrap_write"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "testimonial_write: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "testimonial_write"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "message_receive: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "message_receive"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "show_profile_visits",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "show_profile_visits"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "viewer_shows_visits!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_friend!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 9,
+        "name": "viewer_is_fan!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 10,
+        "name": "is_blocked!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "relationship!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "a74eb4b4d93c6492430b656b47e2b85ada823cb4b7da4a84b7228c3fd2696cfe"
+}

@@ -1,0 +1,10 @@
+mod change_password;
+mod forgot_password;
+mod google;
+mod login;
+mod logout;
+mod register;
+mod reset_password;
+mod send_verification_email;
+mod session;
+mod verify_email;

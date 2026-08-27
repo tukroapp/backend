@@ -1,0 +1,230 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            au.id,\n            au.email AS \"email!: String\",\n            au.status AS \"account_status: AccountStatus\",\n            au.suspended_until,\n            au.is_email_verified,\n            au.created_at AS registered_at,\n            up.slug,\n            up.name,\n            up.avatar_url,\n            up.status,\n            up.bio,\n            up.city,\n            up.birthdate,\n            (SELECT COUNT(*) FROM friend f WHERE f.user_id = au.id) AS \"friends_count!\",\n            (SELECT COUNT(*) FROM scrap s WHERE s.author_id = au.id) AS \"scraps_written_count!\",\n            (SELECT COUNT(*) FROM scrap s WHERE s.profile_id = au.id) AS \"scraps_received_count!\",\n            (SELECT COUNT(*) FROM testimonial t WHERE t.author_id = au.id) AS \"testimonials_written_count!\",\n            (SELECT COUNT(*) FROM block b WHERE b.blocked_id = au.id) AS \"blocked_by_count!\",\n            (SELECT COUNT(*) FROM report r WHERE r.reported_user_id = au.id) AS \"reports_count!\"\n        FROM auth_user au\n        INNER JOIN user_profile up ON up.user_id = au.id\n        WHERE au.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email!: String",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "account_status: AccountStatus",
+        "type_info": {
+          "Custom": {
+            "name": "account_status",
+            "kind": {
+              "Enum": [
+                "active",
+                "suspended",
+                "deactivated"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "suspended_until",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "suspended_until"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "is_email_verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "is_email_verified"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "registered_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "bio",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "bio"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "city",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "birthdate",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "birthdate"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "friends_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 14,
+        "name": "scraps_written_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 15,
+        "name": "scraps_received_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 16,
+        "name": "testimonials_written_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 17,
+        "name": "blocked_by_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 18,
+        "name": "reports_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "ed343a8a5efa11ef9bfd2e080f3a0c8e0306714495407bb59d5972a1777c51fe"
+}

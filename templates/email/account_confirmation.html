@@ -1,0 +1,22 @@
+{% extends "email/base.html" %}
+{% block title %}
+    Confirmação de Conta
+{% endblock %}
+{% block head %}
+    <meta name="confirmation-token" content="{{ confirmation_token }}" />
+{% endblock %}
+{% block content %}
+    <h1>Confirmação de Conta</h1>
+    {% if name != "" %}
+        <p>Prezado(a) {{ name }},</p>
+    {% else %}
+        <p>Prezado(a) Usuário(a),</p>
+    {% endif %}
+    <p>
+        Conforme sua solicitação, aqui está o e-mail de confirmação da conta. Por
+        favor, confirme seu endereço de e-mail clicando no link abaixo:
+    </p>
+    <p>
+        <a href="{{ frontend_url }}/auth/verify-email?token={{ confirmation_token }}">Confirmar minha conta</a>
+    </p>
+{% endblock %}

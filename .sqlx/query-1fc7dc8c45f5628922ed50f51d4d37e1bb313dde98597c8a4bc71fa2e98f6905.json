@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT role AS \"role: CommunityRole\"\n        FROM community_member\n        WHERE community_id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role: CommunityRole",
+        "type_info": {
+          "Custom": {
+            "name": "community_role",
+            "kind": {
+              "Enum": [
+                "member",
+                "admin",
+                "owner"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "community_member",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1fc7dc8c45f5628922ed50f51d4d37e1bb313dde98597c8a4bc71fa2e98f6905"
+}
