@@ -21,6 +21,7 @@ mod poll;
 mod profile;
 mod rating;
 mod report;
+mod seed_admin;
 mod scrap;
 mod testimonial;
 mod topic;

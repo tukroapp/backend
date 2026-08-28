@@ -217,19 +217,6 @@ CREATE TABLE user_profile(
 SELECT
     set_updated_at_for('user_profile');
 
-WITH admin AS (
-INSERT INTO auth_user(id, email, is_superuser, is_email_verified, password_hash)
-        VALUES (uuidv7(), 'admin@tukro.app', TRUE, TRUE, '$argon2id$v=19$m=15000,t=2,p=1$dWpLdm0wSUp3SlpiV3M2Wg$PXrOQrksfMVxormqUYHA905vA7Y3rdumPDIw+Ah0g2o')
-    RETURNING
-        id)
-    INSERT INTO user_profile(user_id, slug, name)
-    SELECT
-        id,
-        'admin',
-        'Administrador'
-    FROM
-        admin;
-
 CREATE TABLE verification_token(
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     token_hash TEXT NOT NULL,

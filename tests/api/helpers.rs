@@ -38,6 +38,7 @@ pub struct TestApp {
     pub database_name: String,
     pub mock_google_server: MockServer,
     pub server_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
+    pub configuration: tukro_backend::configuration::Settings,
 }
 
 impl Drop for TestApp {
@@ -82,6 +83,15 @@ impl Drop for TestApp {
 }
 
 impl TestApp {
+    /// Sobe a aplicação de novo contra o mesmo banco, sem servir requisições: é
+    /// o que um segundo deploy faria, e o que o seed do admin precisa aguentar.
+    #[allow(dead_code)]
+    pub async fn boot_again(&self) {
+        Application::build(self.configuration.clone())
+            .await
+            .expect("Failed to build the application again");
+    }
+
     pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
     where
         Body: serde::Serialize,
@@ -323,6 +333,7 @@ pub async fn spawn_app() -> TestApp {
         c.application.google_user_info_uri = format!("{}/userinfo", mock_google_server.uri());
         c.application.google_client_id = "test_id".to_string();
         c.application.google_client_secret = "test_secret".to_string();
+        c.application.admin_password_first_access = Some("primeiro-acesso-do-teste".to_string());
         c
     };
 
@@ -352,6 +363,7 @@ pub async fn spawn_app() -> TestApp {
         database_name,
         mock_google_server,
         server_handle,
+        configuration,
     };
 
     test_app.test_user.store(&test_app.db_pool).await;

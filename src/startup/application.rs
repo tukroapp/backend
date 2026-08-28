@@ -7,7 +7,10 @@ use tokio::fs;
 
 use crate::{
     configuration::{DatabaseSettings, Environment, RedisSettings, Settings},
-    services::storage::{LocalStorage, S3Storage, StorageService},
+    services::{
+        seed::ensure_seed_admin,
+        storage::{LocalStorage, S3Storage, StorageService},
+    },
 };
 
 use super::{AppState, RedisPool, RunConfig, run};
@@ -21,6 +24,17 @@ impl Application {
     pub async fn build(configuration: Settings) -> Result<Self, std::io::Error> {
         let connection_pool = get_connection_pool(&configuration.database);
         let redis_pool = get_redis_pool(&configuration.redis);
+
+        ensure_seed_admin(
+            &connection_pool,
+            &configuration.application.admin_email,
+            configuration
+                .application
+                .admin_password_first_access
+                .as_deref(),
+        )
+        .await
+        .map_err(std::io::Error::other)?;
 
         let address = format!(
             "{}:{}",
