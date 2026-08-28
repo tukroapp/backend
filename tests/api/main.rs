@@ -1,6 +1,7 @@
 mod admin_report;
 mod admin_user;
 mod auth;
+mod birthday;
 mod block;
 mod community;
 mod fan;

@@ -15,6 +15,10 @@ pub const EMAIL_BATCH_SIZE: i64 = 10;
 pub const EMAIL_MAX_CONCURRENT: usize = 4;
 pub const EMAIL_POLL_INTERVAL: Duration = Duration::from_secs(10);
 
+/// Usado quando a requisição não manda o fuso. O público é brasileiro, então cair
+/// em UTC daria um "hoje" errado por três horas todo dia.
+pub const DEFAULT_TIME_ZONE: &str = "America/Sao_Paulo";
+
 pub const MAX_UPLOAD_SIZE_BYTES: usize = 25 * 1024 * 1024; // 25 MB
 
 pub const MAX_FRIENDS: i64 = 5_000;

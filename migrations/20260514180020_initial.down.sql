@@ -74,6 +74,8 @@ DROP TYPE IF EXISTS community_role;
 
 DROP TYPE IF EXISTS approval_status;
 
+DROP TYPE IF EXISTS relationship_status;
+
 DROP TYPE IF EXISTS visibility;
 
 DROP TYPE IF EXISTS account_status;

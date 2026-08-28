@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            (NOW() AT TIME ZONE COALESCE(\n                (SELECT name FROM pg_timezone_names WHERE name = $1), 'UTC'\n            ))::date AS \"today!\",\n            EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = $1) AS \"known!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "today!",
+        "type_info": "Date",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "known!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "716a71dc5cd7e7d1442148cd75d8dc4bb9e743c88ad2464623802cc5a0738d31"
+}

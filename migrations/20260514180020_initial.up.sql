@@ -43,6 +43,18 @@ CREATE TYPE visibility AS ENUM(
     'nobody'
 );
 
+CREATE TYPE relationship_status AS ENUM(
+    'single',
+    'dating',
+    'engaged',
+    'married',
+    'stable_union',
+    'open_relationship',
+    'complicated',
+    'separated',
+    'widowed'
+);
+
 CREATE TYPE approval_status AS ENUM(
     'pending',
     'accepted',
@@ -135,6 +147,25 @@ CREATE TABLE user_profile(
     bio TEXT,
     city TEXT,
     birthdate DATE,
+    -- Perfil detalhado, no estilo das abas social, profissional e pessoal do
+    -- Orkut. Tudo é opcional: as listas chegam vazias e os textos NULL.
+    relationship_status relationship_status,
+    country TEXT,
+    state TEXT,
+    languages TEXT[] NOT NULL DEFAULT '{}',
+    interests TEXT[] NOT NULL DEFAULT '{}',
+    who_i_want_to_meet TEXT,
+    occupation TEXT,
+    company TEXT,
+    education TEXT,
+    music TEXT[] NOT NULL DEFAULT '{}',
+    movies TEXT[] NOT NULL DEFAULT '{}',
+    books TEXT[] NOT NULL DEFAULT '{}',
+    tv_shows TEXT[] NOT NULL DEFAULT '{}',
+    foods TEXT[] NOT NULL DEFAULT '{}',
+    sports TEXT[] NOT NULL DEFAULT '{}',
+    pets TEXT,
+    fashion_style TEXT,
     profile_visibility visibility NOT NULL DEFAULT 'everyone',
     scrap_read visibility NOT NULL DEFAULT 'everyone',
     scrap_write visibility NOT NULL DEFAULT 'friends',
@@ -151,7 +182,15 @@ CREATE TABLE user_profile(
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT check_user_profile_slug_format CHECK (slug ~ '^[a-z0-9]([a-z0-9-]{1,28}[a-z0-9])$'),
-    CONSTRAINT check_user_profile_name_length CHECK (CHAR_LENGTH(NAME) BETWEEN 1 AND 80)
+    CONSTRAINT check_user_profile_name_length CHECK (CHAR_LENGTH(NAME) BETWEEN 1 AND 80),
+    CONSTRAINT check_user_profile_list_size CHECK (CARDINALITY(languages) <= 20
+        AND CARDINALITY(interests) <= 30
+        AND CARDINALITY(music) <= 30
+        AND CARDINALITY(movies) <= 30
+        AND CARDINALITY(books) <= 30
+        AND CARDINALITY(tv_shows) <= 30
+        AND CARDINALITY(foods) <= 30
+        AND CARDINALITY(sports) <= 30)
 );
 
 SELECT
@@ -225,6 +264,8 @@ CREATE TABLE email_log(
 CREATE INDEX idx_email_log_sent_at ON email_log(sent_at);
 
 CREATE INDEX idx_user_profile_name_trgm ON user_profile USING GIN(name gin_trgm_ops);
+
+CREATE INDEX idx_user_profile_city_trgm ON user_profile USING GIN(city gin_trgm_ops);
 
 CREATE TABLE user_media(
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),

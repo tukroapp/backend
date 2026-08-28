@@ -34,6 +34,7 @@ use crate::routes::{
         me::delete_avatar,
         me::visitor,
         me::unread,
+        me::birthday,
 
         // Feed
         feed::list,

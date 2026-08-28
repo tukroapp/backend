@@ -446,3 +446,102 @@ async fn avatar_requires_authentication() {
     // Assert
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn put_me_updates_the_detailed_profile() {
+    // Arrange
+    let app = spawn_app().await;
+    app.test_user.login(&app).await;
+
+    // Act
+    let filled: serde_json::Value = app
+        .api_client
+        .put(format!("{}/api/v1/me", &app.address))
+        .header(reqwest::header::AUTHORIZATION, app.test_user.auth_header())
+        .json(&json!({
+            "name": "Test User",
+            "relationship_status": "married",
+            "country": "Brasil",
+            "state": "PR",
+            // item em branco e espaço nas pontas são limpos no servidor
+            "interests": ["  Fliperama  ", "", "Rock progressivo"],
+            "who_i_want_to_meet": "Quem lembra do Orkut",
+            "occupation": "Desenvolvedor",
+            "movies": ["Matrix"],
+            "pets": "Um gato",
+        }))
+        .send()
+        .await
+        .expect("Failed to send request")
+        .json()
+        .await
+        .expect("me response not JSON");
+
+    // A segunda chamada omite as listas: o PUT é substituição, então elas voltam
+    // a ficar vazias.
+    let cleared: serde_json::Value = app
+        .api_client
+        .put(format!("{}/api/v1/me", &app.address))
+        .header(reqwest::header::AUTHORIZATION, app.test_user.auth_header())
+        .json(&json!({ "name": "Test User" }))
+        .send()
+        .await
+        .expect("Failed to send request")
+        .json()
+        .await
+        .expect("me response not JSON");
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(filled["results"]["relationship_status"], "married");
+    assert_eq!(filled["results"]["country"], "Brasil");
+    assert_eq!(filled["results"]["state"], "PR");
+    assert_eq!(
+        filled["results"]["interests"],
+        json!(["Fliperama", "Rock progressivo"])
+    );
+    assert_eq!(
+        filled["results"]["who_i_want_to_meet"],
+        "Quem lembra do Orkut"
+    );
+    assert_eq!(filled["results"]["occupation"], "Desenvolvedor");
+    assert_eq!(filled["results"]["movies"], json!(["Matrix"]));
+    assert_eq!(filled["results"]["pets"], "Um gato");
+    assert_eq!(cleared["results"]["interests"], json!([]));
+    assert_eq!(
+        cleared["results"]["relationship_status"],
+        serde_json::Value::Null
+    );
+}
+
+#[tokio::test]
+async fn put_me_rejects_a_list_item_that_is_too_long() {
+    // Arrange
+    let app = spawn_app().await;
+    app.test_user.login(&app).await;
+
+    // Act
+    let response = app
+        .api_client
+        .put(format!("{}/api/v1/me", &app.address))
+        .header(reqwest::header::AUTHORIZATION, app.test_user.auth_header())
+        .json(&json!({
+            "name": "Test User",
+            "interests": ["a".repeat(81)],
+        }))
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    let status = response.status();
+    let body: serde_json::Value = response.json().await.expect("me response not JSON");
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"]["interests"][0]["code"], "item_too_long");
+}

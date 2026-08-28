@@ -1,0 +1,361 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            slug, name, avatar_url, status, bio, city, birthdate, created_at,\n            relationship_status AS \"relationship_status: RelationshipStatus\",\n            country, state, languages, interests, who_i_want_to_meet,\n            occupation, company, education, music, movies, books, tv_shows,\n            foods, sports, pets, fashion_style,\n            -- As contagens ignoram quem não está ativo, senão o número não bate\n            -- com a listagem correspondente, que também esconde essa gente.\n            (\n                SELECT COUNT(*) FROM friend f\n                INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n                WHERE f.user_id = user_profile.user_id\n            ) AS \"friends_count!\",\n            (\n                SELECT COUNT(*) FROM scrap s\n                INNER JOIN auth_user au ON au.id = s.author_id AND au.status = 'active'\n                WHERE s.profile_id = user_profile.user_id\n                  AND s.parent_id IS NULL\n                  AND s.deleted_at IS NULL\n            ) AS \"scraps_count!\",\n            (\n                SELECT COUNT(*) FROM testimonial t\n                INNER JOIN auth_user au ON au.id = t.author_id AND au.status = 'active'\n                WHERE t.profile_id = user_profile.user_id\n                  AND t.status = 'accepted'\n                  AND t.deleted_at IS NULL\n            ) AS \"testimonials_count!\",\n            (\n                SELECT COUNT(*) FROM fan\n                INNER JOIN auth_user au ON au.id = fan.fan_id AND au.status = 'active'\n                WHERE fan.idol_id = user_profile.user_id\n            ) AS \"fans_count!\"\n        FROM user_profile\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "bio",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "bio"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "city",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "birthdate",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "birthdate"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "relationship_status: RelationshipStatus",
+        "type_info": {
+          "Custom": {
+            "name": "relationship_status",
+            "kind": {
+              "Enum": [
+                "single",
+                "dating",
+                "engaged",
+                "married",
+                "stable_union",
+                "open_relationship",
+                "complicated",
+                "separated",
+                "widowed"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "relationship_status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "country"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "languages",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "languages"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "interests",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "interests"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "who_i_want_to_meet",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "who_i_want_to_meet"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "occupation",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "occupation"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "company",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "company"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "education",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "education"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "music",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "music"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "movies",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "movies"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "books",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "books"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "tv_shows",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "tv_shows"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "foods",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "foods"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "sports",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "sports"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "pets",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "pets"
+          }
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "fashion_style",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "fashion_style"
+          }
+        }
+      },
+      {
+        "ordinal": 25,
+        "name": "friends_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 26,
+        "name": "scraps_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 27,
+        "name": "testimonials_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 28,
+        "name": "fans_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "580d966d42211565d353e15cd92797218c81ab987550d3826cd48c0e6a572c13"
+}

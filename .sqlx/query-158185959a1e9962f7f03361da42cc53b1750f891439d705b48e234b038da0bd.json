@@ -1,0 +1,98 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            up.user_id AS id,\n            up.slug,\n            up.name,\n            up.avatar_url,\n            up.status,\n            EXTRACT(DAY FROM up.birthdate)::int AS \"day!\",\n            (EXTRACT(YEAR FROM $2::date) - EXTRACT(YEAR FROM up.birthdate))::int AS \"age!\",\n            -- O mês já está filtrado no WHERE, então o dia basta. Quem nasceu em\n            -- 29 de fevereiro aparece no mês, mas só é \"hoje\" em ano bissexto.\n            (EXTRACT(DAY FROM up.birthdate) = EXTRACT(DAY FROM $2::date)) AS \"is_today!\"\n        FROM friend f\n        INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n        INNER JOIN user_profile up ON up.user_id = f.friend_id\n        WHERE f.user_id = $1\n          AND up.birthdate IS NOT NULL\n          -- Perfil fechado para todo mundo some daqui também, igual no feed.\n          AND up.profile_visibility <> 'nobody'\n          AND EXTRACT(MONTH FROM up.birthdate) = EXTRACT(MONTH FROM $2::date)\n        ORDER BY EXTRACT(DAY FROM up.birthdate), up.name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "day!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "age!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "is_today!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "158185959a1e9962f7f03361da42cc53b1750f891439d705b48e234b038da0bd"
+}

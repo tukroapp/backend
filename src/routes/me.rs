@@ -3,7 +3,7 @@ use std::{io::Read, sync::Arc};
 use actix_multipart::form::{MultipartForm, tempfile::TempFile};
 use actix_web::{
     HttpResponse, Responder,
-    web::{Data, Json},
+    web::{Data, Json, Query},
 };
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -13,6 +13,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
+    constants::DEFAULT_TIME_ZONE,
     routes::profile::ProfileSummary,
     services::{
         activity::{NewActivity, record_activity},
@@ -21,7 +22,7 @@ use crate::{
         visit::recent_visitors,
     },
     startup::RedisPool,
-    utils::{ApiErrorResponse, ApiResponse, db_err, e500, invalid_field},
+    utils::{ApiErrorResponse, ApiResponse, db_err, e500, invalid_field, validate_list_items},
 };
 use chrono::{DateTime, Utc};
 
@@ -33,6 +34,22 @@ pub enum Visibility {
     Everyone,
     Friends,
     Nobody,
+}
+
+/// Espelha o enum `relationship_status` do banco.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, sqlx::Type)]
+#[sqlx(type_name = "relationship_status", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum RelationshipStatus {
+    Single,
+    Dating,
+    Engaged,
+    Married,
+    StableUnion,
+    OpenRelationship,
+    Complicated,
+    Separated,
+    Widowed,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -49,6 +66,25 @@ pub struct MeResponse {
     pub bio: Option<String>,
     pub city: Option<String>,
     pub birthdate: Option<NaiveDate>,
+    /// Perfil detalhado. Para quem olha de fora esses campos vêm dentro de
+    /// `details`, no `GET /profile/{slug}`, e somem quando a privacidade fecha.
+    pub relationship_status: Option<RelationshipStatus>,
+    pub country: Option<String>,
+    pub state: Option<String>,
+    pub languages: Vec<String>,
+    pub interests: Vec<String>,
+    pub who_i_want_to_meet: Option<String>,
+    pub occupation: Option<String>,
+    pub company: Option<String>,
+    pub education: Option<String>,
+    pub music: Vec<String>,
+    pub movies: Vec<String>,
+    pub books: Vec<String>,
+    pub tv_shows: Vec<String>,
+    pub foods: Vec<String>,
+    pub sports: Vec<String>,
+    pub pets: Option<String>,
+    pub fashion_style: Option<String>,
     /// Quem vê o perfil completo, incluindo a lista de amigos.
     pub profile_visibility: Visibility,
     /// Quem lê os scraps do mural.
@@ -90,6 +126,23 @@ async fn fetch_me(
             up.bio,
             up.city,
             up.birthdate,
+            up.relationship_status AS "relationship_status: RelationshipStatus",
+            up.country,
+            up.state,
+            up.languages,
+            up.interests,
+            up.who_i_want_to_meet,
+            up.occupation,
+            up.company,
+            up.education,
+            up.music,
+            up.movies,
+            up.books,
+            up.tv_shows,
+            up.foods,
+            up.sports,
+            up.pets,
+            up.fashion_style,
             up.profile_visibility AS "profile_visibility: Visibility",
             up.scrap_read AS "scrap_read: Visibility",
             up.scrap_write AS "scrap_write: Visibility",
@@ -185,6 +238,15 @@ pub async fn put(
     .await
     .map_err(db_err)?;
 
+    let languages = clean_list(payload.languages);
+    let interests = clean_list(payload.interests);
+    let music = clean_list(payload.music);
+    let movies = clean_list(payload.movies);
+    let books = clean_list(payload.books);
+    let tv_shows = clean_list(payload.tv_shows);
+    let foods = clean_list(payload.foods);
+    let sports = clean_list(payload.sports);
+
     sqlx::query!(
         r#"
         UPDATE user_profile
@@ -193,19 +255,53 @@ pub async fn put(
             bio = $3,
             city = $4,
             birthdate = $5,
-            profile_visibility = COALESCE($6, profile_visibility),
-            scrap_read = COALESCE($7, scrap_read),
-            scrap_write = COALESCE($8, scrap_write),
-            testimonial_write = COALESCE($9, testimonial_write),
-            message_receive = COALESCE($10, message_receive),
-            show_profile_visits = COALESCE($11, show_profile_visits)
-        WHERE user_id = $12
+            relationship_status = $6,
+            country = $7,
+            state = $8,
+            languages = $9,
+            interests = $10,
+            who_i_want_to_meet = $11,
+            occupation = $12,
+            company = $13,
+            education = $14,
+            music = $15,
+            movies = $16,
+            books = $17,
+            tv_shows = $18,
+            foods = $19,
+            sports = $20,
+            pets = $21,
+            fashion_style = $22,
+            profile_visibility = COALESCE($23, profile_visibility),
+            scrap_read = COALESCE($24, scrap_read),
+            scrap_write = COALESCE($25, scrap_write),
+            testimonial_write = COALESCE($26, testimonial_write),
+            message_receive = COALESCE($27, message_receive),
+            show_profile_visits = COALESCE($28, show_profile_visits)
+        WHERE user_id = $29
         "#,
         payload.name,
         payload.status,
         payload.bio,
         payload.city,
         payload.birthdate,
+        payload.relationship_status as Option<RelationshipStatus>,
+        payload.country,
+        payload.state,
+        &languages,
+        &interests,
+        payload.who_i_want_to_meet,
+        payload.occupation,
+        payload.company,
+        payload.education,
+        &music,
+        &movies,
+        &books,
+        &tv_shows,
+        &foods,
+        &sports,
+        payload.pets,
+        payload.fashion_style,
         payload.profile_visibility as Option<Visibility>,
         payload.scrap_read as Option<Visibility>,
         payload.scrap_write as Option<Visibility>,
@@ -241,6 +337,16 @@ pub async fn put(
     Ok(HttpResponse::Ok().json(ApiResponse::new(me)))
 }
 
+/// Tira o espaço das pontas e descarta item vazio: o formulário manda linha em
+/// branco quando a pessoa apaga um item da lista.
+fn clean_list(values: Vec<String>) -> Vec<String> {
+    values
+        .into_iter()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
 #[derive(Deserialize, Validate, ToSchema)]
 pub struct UpdateProfileRequest {
     #[validate(length(min = 1, max = 80, message = "O nome deve ter entre 1 e 80 caracteres"))]
@@ -258,6 +364,71 @@ pub struct UpdateProfileRequest {
 
     #[schema(example = "1990-05-20")]
     pub birthdate: Option<NaiveDate>,
+
+    pub relationship_status: Option<RelationshipStatus>,
+
+    #[validate(length(max = 80))]
+    #[schema(example = "Brasil")]
+    pub country: Option<String>,
+
+    #[validate(length(max = 80))]
+    #[schema(example = "SP")]
+    pub state: Option<String>,
+
+    /// Listas do perfil detalhado. Item em branco é descartado no servidor, e
+    /// omitir a lista limpa a lista, igual aos campos de texto.
+    #[validate(length(max = 20), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    #[schema(example = json!(["Português", "Inglês"]))]
+    pub languages: Vec<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    #[schema(example = json!(["Rock progressivo", "Fliperama"]))]
+    pub interests: Vec<String>,
+
+    #[validate(length(max = 1000))]
+    pub who_i_want_to_meet: Option<String>,
+
+    #[validate(length(max = 120))]
+    #[schema(example = "Desenvolvedor")]
+    pub occupation: Option<String>,
+
+    #[validate(length(max = 120))]
+    pub company: Option<String>,
+
+    #[validate(length(max = 200))]
+    pub education: Option<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    pub music: Vec<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    pub movies: Vec<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    pub books: Vec<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    pub tv_shows: Vec<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    pub foods: Vec<String>,
+
+    #[validate(length(max = 30), custom(function = "validate_list_items"))]
+    #[serde(default)]
+    pub sports: Vec<String>,
+
+    #[validate(length(max = 120))]
+    pub pets: Option<String>,
+
+    #[validate(length(max = 120))]
+    pub fashion_style: Option<String>,
 
     /// Campos de privacidade: diferente dos demais, quando omitidos mantêm o
     /// valor atual, para que salvar o formulário de perfil não reabra o perfil
@@ -500,6 +671,139 @@ pub async fn visitor(
         enabled: true,
         count_30d,
         recent,
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BirthdayQuery {
+    /// Fuso horário IANA de quem está chamando, como `America/Sao_Paulo`.
+    pub tz: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct Birthday {
+    pub profile: ProfileSummary,
+    /// Dia do mês do aniversário.
+    pub day: i32,
+    /// Idade que a pessoa completa neste ano.
+    pub age: i32,
+    pub is_today: bool,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct BirthdayResponse {
+    /// Hoje no fuso recebido. Vai junto para a tela não depender do relógio local
+    /// para saber de que dia a lista está falando.
+    pub today: NaiveDate,
+    /// O fuso que foi usado de verdade, que é o padrão quando `tz` não vem.
+    pub time_zone: String,
+    /// Aniversariantes do mês corrente, do dia 1 para o 31.
+    pub birthdays: Vec<Birthday>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/birthday",
+    description = "Aniversariantes do mês entre os amigos, no fuso de quem chama. Sem paginação: o mês tem no máximo os amigos do usuário",
+    params(
+        ("tz" = Option<String>, Query, description = "Fuso IANA de quem chama, como America/Sao_Paulo. Sem ele, o padrão do servidor"),
+    ),
+    responses(
+        (status = 200, description = "Aniversariantes do mês", body = ApiResponse<BirthdayResponse>),
+        (status = 400, description = "Fuso horário desconhecido", body = ApiErrorResponse),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Lista os aniversariantes do mês entre os amigos", skip_all)]
+pub async fn birthday(
+    query: Query<BirthdayQuery>,
+    session: SessionData,
+    pool: Data<PgPool>,
+    storage: Data<Arc<dyn StorageService>>,
+) -> Result<impl Responder, actix_web::Error> {
+    let time_zone = query
+        .tz
+        .as_deref()
+        .map(str::trim)
+        .filter(|tz| !tz.is_empty())
+        .unwrap_or(DEFAULT_TIME_ZONE)
+        .to_owned();
+
+    // `AT TIME ZONE` estoura erro de banco com um fuso que não existe, então a
+    // mesma consulta cai em UTC e diz se o nome recebido é conhecido.
+    let now = sqlx::query!(
+        r#"
+        SELECT
+            (NOW() AT TIME ZONE COALESCE(
+                (SELECT name FROM pg_timezone_names WHERE name = $1), 'UTC'
+            ))::date AS "today!",
+            EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = $1) AS "known!"
+        "#,
+        time_zone,
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    if !now.known {
+        return Ok(invalid_field(
+            "tz",
+            "unknown_time_zone",
+            "Fuso horário desconhecido.",
+        ));
+    }
+
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            up.user_id AS id,
+            up.slug,
+            up.name,
+            up.avatar_url,
+            up.status,
+            EXTRACT(DAY FROM up.birthdate)::int AS "day!",
+            (EXTRACT(YEAR FROM $2::date) - EXTRACT(YEAR FROM up.birthdate))::int AS "age!",
+            -- O mês já está filtrado no WHERE, então o dia basta. Quem nasceu em
+            -- 29 de fevereiro aparece no mês, mas só é "hoje" em ano bissexto.
+            (EXTRACT(DAY FROM up.birthdate) = EXTRACT(DAY FROM $2::date)) AS "is_today!"
+        FROM friend f
+        INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'
+        INNER JOIN user_profile up ON up.user_id = f.friend_id
+        WHERE f.user_id = $1
+          AND up.birthdate IS NOT NULL
+          -- Perfil fechado para todo mundo some daqui também, igual no feed.
+          AND up.profile_visibility <> 'nobody'
+          AND EXTRACT(MONTH FROM up.birthdate) = EXTRACT(MONTH FROM $2::date)
+        ORDER BY EXTRACT(DAY FROM up.birthdate), up.name
+        "#,
+        session.user_id,
+        now.today,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let storage = storage.as_ref().as_ref();
+    let birthdays = rows
+        .into_iter()
+        .map(|row| Birthday {
+            profile: ProfileSummary {
+                id: row.id,
+                slug: row.slug,
+                name: row.name,
+                avatar_url: public_url_of(storage, row.avatar_url),
+                status: row.status,
+            },
+            day: row.day,
+            age: row.age,
+            is_today: row.is_today,
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(ApiResponse::new(BirthdayResponse {
+        today: now.today,
+        time_zone,
+        birthdays,
     })))
 }
 

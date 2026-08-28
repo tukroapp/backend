@@ -1,0 +1,114 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_profile\n        SET name = $1,\n            status = $2,\n            bio = $3,\n            city = $4,\n            birthdate = $5,\n            relationship_status = $6,\n            country = $7,\n            state = $8,\n            languages = $9,\n            interests = $10,\n            who_i_want_to_meet = $11,\n            occupation = $12,\n            company = $13,\n            education = $14,\n            music = $15,\n            movies = $16,\n            books = $17,\n            tv_shows = $18,\n            foods = $19,\n            sports = $20,\n            pets = $21,\n            fashion_style = $22,\n            profile_visibility = COALESCE($23, profile_visibility),\n            scrap_read = COALESCE($24, scrap_read),\n            scrap_write = COALESCE($25, scrap_write),\n            testimonial_write = COALESCE($26, testimonial_write),\n            message_receive = COALESCE($27, message_receive),\n            show_profile_visits = COALESCE($28, show_profile_visits)\n        WHERE user_id = $29\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Date",
+        {
+          "Custom": {
+            "name": "relationship_status",
+            "kind": {
+              "Enum": [
+                "single",
+                "dating",
+                "engaged",
+                "married",
+                "stable_union",
+                "open_relationship",
+                "complicated",
+                "separated",
+                "widowed"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text",
+        "TextArray",
+        "TextArray",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "229be852505047667d9d55c8781f8f49658b5bce28e490b930e850e9c7d6d32b"
+}

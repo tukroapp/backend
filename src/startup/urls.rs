@@ -127,6 +127,7 @@ fn me_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         .service(resource("/media/{id}").route(delete().to(media::delete)))
         .service(resource("/visitor").route(get().to(me::visitor)))
         .service(resource("/unread").route(get().to(me::unread)))
+        .service(resource("/birthday").route(get().to(me::birthday)))
         .service(resource("/feed").route(get().to(feed::list)))
         .service(resource("/feed/seen").route(post().to(feed::seen)))
         .service(

@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use crate::{
     routes::{
-        me::Visibility,
+        me::{RelationshipStatus, Visibility},
         profile::{
             ProfileSummary,
             slug::rating::{MyRating, RatingSummary},
@@ -39,6 +39,29 @@ use crate::{
 /// Quantidade de amigos exibida no próprio perfil, antes de abrir a lista completa.
 const FRIENDS_PREVIEW_LIMIT: i64 = 9;
 
+/// Perfil detalhado, no estilo das abas social, profissional e pessoal do Orkut.
+/// Só chega para quem a privacidade do dono deixa ver.
+#[derive(Serialize, ToSchema)]
+pub struct ProfileDetails {
+    pub relationship_status: Option<RelationshipStatus>,
+    pub country: Option<String>,
+    pub state: Option<String>,
+    pub languages: Vec<String>,
+    pub interests: Vec<String>,
+    pub who_i_want_to_meet: Option<String>,
+    pub occupation: Option<String>,
+    pub company: Option<String>,
+    pub education: Option<String>,
+    pub music: Vec<String>,
+    pub movies: Vec<String>,
+    pub books: Vec<String>,
+    pub tv_shows: Vec<String>,
+    pub foods: Vec<String>,
+    pub sports: Vec<String>,
+    pub pets: Option<String>,
+    pub fashion_style: Option<String>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct ProfileResponse {
     pub slug: String,
@@ -49,6 +72,9 @@ pub struct ProfileResponse {
     pub city: Option<String>,
     pub birthdate: Option<NaiveDate>,
     pub created_at: DateTime<Utc>,
+    /// `null` quando a privacidade do dono esconde o perfil detalhado de quem
+    /// está olhando, a mesma regra da lista de amigos.
+    pub details: Option<ProfileDetails>,
     /// Relação de quem está olhando com esse perfil: `self`, `anonymous`,
     /// `friends`, `request_sent`, `request_received` ou `none`.
     #[schema(example = "none")]
@@ -263,6 +289,10 @@ pub async fn get(
         r#"
         SELECT
             slug, name, avatar_url, status, bio, city, birthdate, created_at,
+            relationship_status AS "relationship_status: RelationshipStatus",
+            country, state, languages, interests, who_i_want_to_meet,
+            occupation, company, education, music, movies, books, tv_shows,
+            foods, sports, pets, fashion_style,
             -- As contagens ignoram quem não está ativo, senão o número não bate
             -- com a listagem correspondente, que também esconde essa gente.
             (
@@ -330,6 +360,25 @@ pub async fn get(
         city: profile.city,
         birthdate: profile.birthdate,
         created_at: profile.created_at,
+        details: target.can_view_profile_details.then_some(ProfileDetails {
+            relationship_status: profile.relationship_status,
+            country: profile.country,
+            state: profile.state,
+            languages: profile.languages,
+            interests: profile.interests,
+            who_i_want_to_meet: profile.who_i_want_to_meet,
+            occupation: profile.occupation,
+            company: profile.company,
+            education: profile.education,
+            music: profile.music,
+            movies: profile.movies,
+            books: profile.books,
+            tv_shows: profile.tv_shows,
+            foods: profile.foods,
+            sports: profile.sports,
+            pets: profile.pets,
+            fashion_style: profile.fashion_style,
+        }),
         relationship: target.relationship,
         friends_visible: target.can_view_profile_details,
         friends_count: target

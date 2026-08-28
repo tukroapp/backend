@@ -616,6 +616,23 @@ pub fn validate_trimmed_string(s: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
+/// Teto de cada item das listas do perfil (interesses, filmes, etc). O banco só
+/// limita a quantidade de itens, o tamanho de cada um é checado aqui.
+const MAX_LIST_ITEM_LENGTH: usize = 80;
+
+pub fn validate_list_items(values: &[String]) -> Result<(), ValidationError> {
+    if values
+        .iter()
+        .any(|value| value.chars().count() > MAX_LIST_ITEM_LENGTH)
+    {
+        let mut error = ValidationError::new("item_too_long");
+        error.message = Some("Cada item pode ter no máximo 80 caracteres".into());
+        return Err(error);
+    }
+
+    Ok(())
+}
+
 /// Tags que o editor do frontend escreve. O corpo pode ter marcação, mas marcação
 /// sozinha não é mensagem: `[i][/i]` passa no `trim` e chega vazio na tela de quem lê.
 const MARKUP_TAGS: [&str; 11] = [
