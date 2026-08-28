@@ -169,6 +169,7 @@ pub async fn put(
     let Some(session) = session else {
         return Ok(unauthorized());
     };
+    session.require_verified_email(pool.get_ref()).await?;
 
     if let Err(errors) = payload.validate() {
         return Ok(HttpResponse::BadRequest().json(ApiErrorResponse::from(errors)));

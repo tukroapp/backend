@@ -192,6 +192,8 @@ pub async fn post(
     pool: Data<PgPool>,
     storage: Data<Arc<dyn StorageService>>,
 ) -> Result<impl Responder, actix_web::Error> {
+    session.require_verified_email(pool.get_ref()).await?;
+
     if form.file.size == 0 {
         return Ok(invalid_field(
             "file",

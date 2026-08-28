@@ -51,6 +51,27 @@ pub async fn post(
         ));
     }
 
+    queue_verification_email(
+        pool.get_ref(),
+        &app_state.frontend_url,
+        session.user_id,
+        &user.email,
+        &user.name,
+    )
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// Gera o token e enfileira o e-mail de confirmação. Fica separado do handler
+/// porque o cadastro também dispara isso, sem passar por aqui.
+pub async fn queue_verification_email(
+    pool: &PgPool,
+    frontend_url: &str,
+    user_id: Uuid,
+    email: &str,
+    name: &str,
+) -> Result<(), actix_web::Error> {
     let token = Uuid::new_v4();
     let token_hash = compute_sha_hash(&token.to_string());
 
@@ -59,27 +80,27 @@ pub async fn post(
         INSERT INTO verification_token (user_id, token_hash, kind, expires_at)
         VALUES ($1, $2, 'email_verification', NOW() + INTERVAL '30 minutes')
         "#,
-        session.user_id,
+        user_id,
         token_hash,
     )
-    .execute(pool.get_ref())
+    .execute(pool)
     .await
     .map_err(db_err)?;
 
     EmailClient::queue_email_single(
-        &pool,
-        &user.email,
+        pool,
+        email,
         "Confirmação de e-mail",
         AccountConfirmationEmailTemplate {
-            name: &user.name,
+            name,
             confirmation_token: &token.to_string(),
-            frontend_url: &app_state.frontend_url,
+            frontend_url,
         },
     )
     .await
     .map_err(e500)?;
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(())
 }
 
 #[derive(Template)]

@@ -9,7 +9,9 @@ use utoipa::ToSchema;
 use validator::Validate;
 
 use crate::{
+    routes::auth::send_verification_email::queue_verification_email,
     services::slug::create_user_profile,
+    startup::AppState,
     telemetry::spawn_blocking_with_tracing,
     utils::{ApiErrorResponse, ApiResponse, compute_hash, db_err, e500},
 };
@@ -33,6 +35,7 @@ pub struct RegisterResponse {
 #[tracing::instrument(name = "Cadastra um novo usuário", skip_all)]
 pub async fn post(
     pool: Data<PgPool>,
+    app_state: Data<AppState>,
     payload: Json<RegisterRequest>,
 ) -> Result<impl Responder, actix_web::Error> {
     if let Err(e) = payload.validate() {
@@ -79,6 +82,20 @@ pub async fn post(
     let slug = create_user_profile(&mut tx, &user_id, &payload.name).await?;
 
     tx.commit().await.map_err(db_err)?;
+
+    // A conta já existe; falhar aqui só custaria o e-mail automático, e o
+    // usuário ainda pode pedir o reenvio.
+    if let Err(error) = queue_verification_email(
+        pool.get_ref(),
+        &app_state.frontend_url,
+        user_id,
+        &payload.email,
+        &payload.name,
+    )
+    .await
+    {
+        tracing::error!(%error, "failed to queue the verification email on register");
+    }
 
     Ok(HttpResponse::Created().json(ApiResponse::new(RegisterResponse { slug })))
 }

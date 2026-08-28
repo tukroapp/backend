@@ -111,9 +111,31 @@ impl RegisteredUser {
     }
 }
 
-/// Cadastra e autentica um usuário, devolvendo slug, e-mail e token.
+/// Cadastra e autentica um usuário, devolvendo slug, e-mail e token. O e-mail
+/// já sai verificado: as ações que aparecem para terceiros exigem isso, e quase
+/// todo teste quer uma conta em pleno funcionamento. Quem testa o próprio
+/// bloqueio usa `register_and_login_unverified`.
 #[allow(dead_code)]
 pub async fn register_and_login(app: &TestApp, name: &str) -> RegisteredUser {
+    let user = register_and_login_unverified(app, name).await;
+
+    sqlx::query!(
+        r#"
+        UPDATE auth_user SET is_email_verified = TRUE
+        WHERE id = (SELECT user_id FROM user_profile WHERE slug = $1)
+        "#,
+        user.slug,
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to verify the test user email");
+
+    user
+}
+
+/// O mesmo cadastro, com o e-mail ainda por confirmar.
+#[allow(dead_code)]
+pub async fn register_and_login_unverified(app: &TestApp, name: &str) -> RegisteredUser {
     let email = format!("{}@test.com", Uuid::new_v4());
     let password = "supersecret123";
 

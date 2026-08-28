@@ -72,12 +72,14 @@ pub async fn post(
     let Some(session) = session else {
         return Ok(unauthorized());
     };
+    session.require_verified_email(pool.get_ref()).await?;
 
     if let Err(errors) = payload.validate() {
         return Ok(HttpResponse::BadRequest().json(ApiErrorResponse::from(errors)));
     }
 
-    let Some(target) = fetch_target(pool.get_ref(), &slug.into_inner(), Some(session.user_id)).await?
+    let Some(target) =
+        fetch_target(pool.get_ref(), &slug.into_inner(), Some(session.user_id)).await?
     else {
         return Ok(profile_not_found());
     };
@@ -144,11 +146,13 @@ pub async fn post(
 
     tx.commit().await.map_err(db_err)?;
 
-    Ok(HttpResponse::Created().json(ApiResponse::new(MessageResponse {
-        id: message.id,
-        conversation_id,
-        body: body.to_owned(),
-        from_me: true,
-        created_at: message.created_at,
-    })))
+    Ok(
+        HttpResponse::Created().json(ApiResponse::new(MessageResponse {
+            id: message.id,
+            conversation_id,
+            body: body.to_owned(),
+            from_me: true,
+            created_at: message.created_at,
+        })),
+    )
 }

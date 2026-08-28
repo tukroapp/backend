@@ -269,6 +269,8 @@ pub async fn post(
     session: SessionData,
     pool: Data<PgPool>,
 ) -> Result<impl Responder, actix_web::Error> {
+    session.require_verified_email(pool.get_ref()).await?;
+
     let Some(addressee_id) = resolve_slug(pool.get_ref(), &slug.into_inner()).await? else {
         return Ok(user_not_found());
     };

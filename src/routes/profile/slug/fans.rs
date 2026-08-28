@@ -131,6 +131,7 @@ pub async fn post(
     let Some(session) = session else {
         return Ok(unauthorized());
     };
+    session.require_verified_email(pool.get_ref()).await?;
 
     let Some(target) =
         fetch_target(pool.get_ref(), &slug.into_inner(), Some(session.user_id)).await?

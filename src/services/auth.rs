@@ -80,6 +80,37 @@ impl SessionData {
             .into()),
         }
     }
+
+    /// Porteiro das ações que aparecem para terceiros. Conta do Google já nasce
+    /// verificada, então na prática isso só barra o cadastro por senha.
+    pub async fn require_verified_email(&self, pool: &PgPool) -> Result<(), actix_web::Error> {
+        let verified = sqlx::query_scalar!(
+            r#"
+            SELECT is_email_verified
+            FROM auth_user
+            WHERE id = $1 AND status = 'active'
+            "#,
+            self.user_id
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(db_err)?;
+
+        if verified == Some(true) {
+            return Ok(());
+        }
+
+        Err(InternalError::from_response(
+            "Email verification required",
+            HttpResponse::Forbidden().json(ApiErrorResponse::from_single_validation_error(
+                "account",
+                "email_not_verified",
+                Some("Confirme seu e-mail para fazer isso."),
+                vec![],
+            )),
+        )
+        .into())
+    }
 }
 
 impl FromRequest for SessionData {

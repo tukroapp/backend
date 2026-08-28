@@ -37,11 +37,7 @@ pub struct PollRequest {
     /// Máximo de opções que o voto pode marcar. Sempre >= `min_choices` e nunca
     /// maior que a quantidade de opções.
     pub max_choices: i16,
-    #[validate(length(
-        min = 2,
-        max = 10,
-        message = "A enquete deve ter entre 2 e 10 opções"
-    ))]
+    #[validate(length(min = 2, max = 10, message = "A enquete deve ter entre 2 e 10 opções"))]
     pub options: Vec<String>,
 }
 
@@ -823,6 +819,7 @@ pub async fn vote(
     let Some(session) = session else {
         return Ok(unauthorized());
     };
+    session.require_verified_email(pool.get_ref()).await?;
 
     let Some(target) =
         fetch_poll_target(pool.get_ref(), id.into_inner(), Some(session.user_id)).await?
@@ -857,14 +854,14 @@ pub async fn vote(
     };
 
     if unique.len() != payload.option_ids.len() {
-        return Ok(
-            HttpResponse::BadRequest().json(ApiErrorResponse::from_single_validation_error(
+        return Ok(HttpResponse::BadRequest().json(
+            ApiErrorResponse::from_single_validation_error(
                 "option_ids",
                 "duplicate_option",
                 Some("O voto não pode repetir a mesma opção."),
                 vec![],
-            )),
-        );
+            ),
+        ));
     }
 
     // `min_choices` e `max_choices` são sempre >= 1 (CHECK do banco), então o
@@ -876,14 +873,14 @@ pub async fn vote(
             "Escolha entre {} e {} opções.",
             target.min_choices, target.max_choices
         );
-        return Ok(
-            HttpResponse::BadRequest().json(ApiErrorResponse::from_single_validation_error(
+        return Ok(HttpResponse::BadRequest().json(
+            ApiErrorResponse::from_single_validation_error(
                 "option_ids",
                 "invalid_choice_count",
                 Some(&message),
                 vec![],
-            )),
-        );
+            ),
+        ));
     }
 
     let matched = sqlx::query_scalar!(
@@ -900,14 +897,14 @@ pub async fn vote(
     .map_err(db_err)?;
 
     if matched != unique.len() as i64 {
-        return Ok(
-            HttpResponse::BadRequest().json(ApiErrorResponse::from_single_validation_error(
+        return Ok(HttpResponse::BadRequest().json(
+            ApiErrorResponse::from_single_validation_error(
                 "option_ids",
                 "invalid_option",
                 Some("Uma das opções não pertence a esta enquete."),
                 vec![],
-            )),
-        );
+            ),
+        ));
     }
 
     let mut tx = pool.begin().await.map_err(db_err)?;
