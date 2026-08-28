@@ -13,7 +13,7 @@ async fn create(
     app.api_client
         .post(format!("{}/api/v1/community", &app.address))
         .header(reqwest::header::AUTHORIZATION, user.auth_header())
-        .json(&json!({ "name": name, "is_private": is_private }))
+        .json(&json!({ "name": name, "category": "outros", "is_private": is_private }))
         .send()
         .await
         .expect("Failed to create community")
@@ -244,7 +244,7 @@ async fn only_the_owner_edits_and_deletes_the_community() {
         .api_client
         .put(format!("{}/api/v1/community/{}", &app.address, slug))
         .header(reqwest::header::AUTHORIZATION, bob.auth_header())
-        .json(&json!({ "name": "Clube do Bob" }))
+        .json(&json!({ "name": "Clube do Bob", "category": "outros" }))
         .send()
         .await
         .expect("Failed to edit community");
@@ -261,7 +261,7 @@ async fn only_the_owner_edits_and_deletes_the_community() {
         .api_client
         .put(format!("{}/api/v1/community/{}", &app.address, slug))
         .header(reqwest::header::AUTHORIZATION, alice.auth_header())
-        .json(&json!({ "name": "Clube da Alice", "is_private": true }))
+        .json(&json!({ "name": "Clube da Alice", "category": "outros", "is_private": true }))
         .send()
         .await
         .expect("Failed to edit community");
@@ -671,7 +671,7 @@ async fn writing_requires_a_session() {
     let create_without_session = app
         .api_client
         .post(format!("{}/api/v1/community", &app.address))
-        .json(&json!({ "name": "Sem sessão" }))
+        .json(&json!({ "name": "Sem sessão", "category": "outros" }))
         .send()
         .await
         .expect("Failed to create community");
@@ -706,8 +706,8 @@ async fn fill_communities(app: &TestApp, slug: &str) {
         WITH target AS (
             SELECT user_id FROM user_profile WHERE slug = $1
         ), filler AS (
-        INSERT INTO community (slug, name)
-            SELECT 'filler-' || i, 'Filler ' || i
+        INSERT INTO community (slug, name, category)
+            SELECT 'filler-' || i, 'Filler ' || i, 'outros'
             FROM generate_series(1, $2::bigint) AS i
         RETURNING
             id

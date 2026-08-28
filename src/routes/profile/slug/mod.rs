@@ -128,6 +128,9 @@ pub struct ProfileResponse {
     pub mutual_friends_count: Option<i64>,
     /// Uma amostra desses amigos em comum, no mesmo limite da prévia de amigos.
     pub mutual_friends: Vec<ProfileSummary>,
+    /// Comunidades que os dois frequentam. `null` nos mesmos casos de
+    /// `mutual_friends_count`.
+    pub mutual_communities_count: Option<i64>,
     /// `false` quando a privacidade do dono esconde o mural de recados de quem
     /// está olhando.
     pub scraps_visible: bool,
@@ -369,7 +372,16 @@ pub async fn get(
                       SELECT 1 FROM friend mine
                       WHERE mine.user_id = $2::uuid AND mine.friend_id = f.friend_id
                   )
-            ) AS "mutual_friends_count!"
+            ) AS "mutual_friends_count!",
+            (
+                SELECT COUNT(*) FROM community_member cm
+                INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL
+                WHERE cm.user_id = user_profile.user_id
+                  AND EXISTS (
+                      SELECT 1 FROM community_member mine
+                      WHERE mine.user_id = $2::uuid AND mine.community_id = cm.community_id
+                  )
+            ) AS "mutual_communities_count!"
         FROM user_profile
         WHERE user_id = $1
         "#,
@@ -468,6 +480,8 @@ pub async fn get(
         mutual_friends_count: (shows_friends && mutual_with.is_some())
             .then_some(profile.mutual_friends_count),
         mutual_friends,
+        mutual_communities_count: (shows_friends && mutual_with.is_some())
+            .then_some(profile.mutual_communities_count),
         scraps_visible: target.can_read_scrap,
         can_write_scrap: target.can_write_scrap,
         scraps_count: target.can_read_scrap.then_some(profile.scraps_count),

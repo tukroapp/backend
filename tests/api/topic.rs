@@ -36,7 +36,7 @@ pub async fn create_community(
         .api_client
         .post(format!("{}/api/v1/community", app.address))
         .header(reqwest::header::AUTHORIZATION, user.auth_header())
-        .json(&json!({ "name": name, "is_private": is_private }))
+        .json(&json!({ "name": name, "category": "outros", "is_private": is_private }))
         .send()
         .await
         .expect("Failed to create community");

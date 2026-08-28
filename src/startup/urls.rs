@@ -131,6 +131,7 @@ fn me_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         .service(resource("/unread").route(get().to(me::unread)))
         .service(resource("/birthday").route(get().to(me::birthday)))
         .service(resource("/feed").route(get().to(feed::list)))
+        .service(resource("/community/friend").route(get().to(community::discover::from_friends)))
         .service(resource("/feed/seen").route(post().to(feed::seen)))
         .service(
             scope("/conversation")
@@ -191,6 +192,7 @@ fn community_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
                 .route(get().to(community::get))
                 .route(post().to(community::post)),
         )
+        .service(resource("/category").route(get().to(community::discover::categories)))
         .service(
             resource("/{slug}")
                 .route(get().to(community::slug::get))

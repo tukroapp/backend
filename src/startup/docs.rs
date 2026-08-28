@@ -90,6 +90,8 @@ use crate::routes::{
 
         // Communities
         community::get,
+        community::discover::categories,
+        community::discover::from_friends,
         community::post,
         community::slug::get,
         community::slug::put,

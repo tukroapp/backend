@@ -126,7 +126,7 @@ async fn create_community(app: &TestApp, owner: &Account, name: &str) -> String 
         .api_client
         .post(format!("{}/api/v1/community", &app.address))
         .header(reqwest::header::AUTHORIZATION, owner.user.auth_header())
-        .json(&json!({ "name": name, "is_private": false }))
+        .json(&json!({ "name": name, "category": "outros", "is_private": false }))
         .send()
         .await
         .expect("Failed to create community");

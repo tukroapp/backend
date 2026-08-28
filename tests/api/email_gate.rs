@@ -51,7 +51,7 @@ async fn writing_for_others_requires_a_verified_email() {
             &app,
             &owner,
             "/community",
-            json!({ "name": "Comunidade", "is_private": false }),
+            json!({ "name": "Comunidade", "category": "outros", "is_private": false }),
         )
         .await,
     )
@@ -132,7 +132,7 @@ async fn writing_for_others_requires_a_verified_email() {
                 &app,
                 &newcomer,
                 "/community",
-                json!({ "name": "Outra", "is_private": false }),
+                json!({ "name": "Outra", "category": "outros", "is_private": false }),
             )
             .await,
         ),
@@ -204,7 +204,7 @@ async fn reading_and_the_own_profile_stay_free_before_verifying() {
             &app,
             &owner,
             "/community",
-            json!({ "name": "Comunidade", "is_private": false }),
+            json!({ "name": "Comunidade", "category": "outros", "is_private": false }),
         )
         .await,
     )

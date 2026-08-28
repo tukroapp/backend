@@ -582,7 +582,7 @@ async fn a_community_report_has_no_accountable_user() {
         .api_client
         .post(format!("{}/api/v1/community", &app.address))
         .header(reqwest::header::AUTHORIZATION, owner.auth_header())
-        .json(&json!({ "name": "Comunidade Suspeita", "is_private": false }))
+        .json(&json!({ "name": "Comunidade Suspeita", "category": "outros", "is_private": false }))
         .send()
         .await
         .expect("Failed to create community");

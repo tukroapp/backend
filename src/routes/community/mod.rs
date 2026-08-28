@@ -1,3 +1,4 @@
+pub mod discover;
 pub mod slug;
 
 use actix_web::{
@@ -5,7 +6,7 @@ use actix_web::{
     web::{Data, Json, Query},
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{PgExecutor, PgPool};
+use sqlx::{PgExecutor, PgPool, Postgres, QueryBuilder};
 use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
@@ -32,6 +33,34 @@ use crate::{
 
 const MIN_SEARCH_LENGTH: usize = 2;
 
+/// Espelha o enum `community_category` do banco, na ordem do índice.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema, sqlx::Type)]
+#[sqlx(type_name = "community_category", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum CommunityCategory {
+    AlunosEExAlunos,
+    ArtesEEntretenimento,
+    Atividades,
+    CidadesEBairros,
+    ComputadoresEInternet,
+    Culinaria,
+    Empresas,
+    Escolas,
+    EsportesELazer,
+    EstiloDeVida,
+    FamiliasELar,
+    FilosofiaEReligiao,
+    GovernoEPolitica,
+    HistoriaECiencia,
+    Jogos,
+    Musica,
+    PaisesERegionalismo,
+    Pessoas,
+    SaudeEBemEstar,
+    Viagens,
+    Outros,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema, sqlx::Type)]
 #[sqlx(type_name = "community_role", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -41,13 +70,14 @@ pub enum CommunityRole {
     Owner,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, sqlx::FromRow)]
 pub struct CommunitySummary {
     pub id: Uuid,
     pub slug: String,
     pub name: String,
     pub description: Option<String>,
     pub avatar_url: Option<String>,
+    pub category: CommunityCategory,
     pub is_private: bool,
     /// Conta apenas membros de contas ativas, como a listagem de membros.
     pub members_count: i64,
@@ -69,6 +99,10 @@ pub struct CommunityRequest {
     #[validate(length(max = 2000))]
     pub description: Option<String>,
 
+    /// Categoria do índice de descoberta. Obrigatória: é por ela que a
+    /// comunidade é encontrada por quem não sabe o nome.
+    pub category: CommunityCategory,
+
     /// Comunidade privada esconde a lista de membros de quem não é membro e
     /// exige aprovação para entrar.
     #[serde(default)]
@@ -78,8 +112,13 @@ pub struct CommunityRequest {
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
     /// Termo buscado por similaridade no nome ou por prefixo do slug. Sem ele, a
-    /// resposta traz as comunidades mais recentes.
+    /// resposta traz o índice, que aceita filtro e ordenação.
     pub q: Option<String>,
+    /// Categoria do índice. Ignorada quando há busca por termo.
+    pub category: Option<CommunityCategory>,
+    /// `created_at_desc` (padrão), `created_at_asc`, `members_desc` ou
+    /// `members_asc`. Uma por vez; repetindo o parâmetro, vale o último.
+    pub sort: Option<String>,
 }
 
 /// Recebe um executor genérico para poder rodar dentro da transação que aprova
@@ -145,6 +184,7 @@ async fn search_communities(
             c.name,
             c.description,
             c.avatar_url,
+            c.category AS "category: CommunityCategory",
             c.is_private,
             (
                 SELECT COUNT(*) FROM community_member cm
@@ -181,6 +221,7 @@ async fn search_communities(
             name: row.name,
             description: row.description,
             avatar_url: public_url_of(storage, row.avatar_url),
+            category: row.category,
             is_private: row.is_private,
             members_count: row.members_count,
         })
@@ -189,46 +230,134 @@ async fn search_communities(
     Ok((results, next_cursor))
 }
 
-/// O id é UUIDv7, então ordenar por ele é o mesmo que ordenar por data de criação.
-async fn recent_communities(
+/// As ordenações aceitas na listagem. O id é UUIDv7, então ordenar por ele é o
+/// mesmo que ordenar por data de criação, sem precisar tocar em `created_at`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum CommunitySort {
+    CreatedAtDesc,
+    CreatedAtAsc,
+    MembersDesc,
+    MembersAsc,
+}
+
+impl CommunitySort {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "created_at_desc" => Some(CommunitySort::CreatedAtDesc),
+            "created_at_asc" => Some(CommunitySort::CreatedAtAsc),
+            "members_desc" => Some(CommunitySort::MembersDesc),
+            "members_asc" => Some(CommunitySort::MembersAsc),
+            _ => None,
+        }
+    }
+
+    /// `true` quando o cursor precisa carregar a contagem junto do id, porque só
+    /// o id não identifica a posição na página.
+    fn counts_in_cursor(self) -> bool {
+        matches!(self, CommunitySort::MembersDesc | CommunitySort::MembersAsc)
+    }
+}
+
+/// O cursor da ordenação por membros carrega a contagem junto do id.
+fn parse_members_cursor(cursor: Option<&str>) -> Option<(i64, Uuid)> {
+    let (count, id) = cursor?.split_once(':')?;
+    Some((count.parse().ok()?, id.parse().ok()?))
+}
+
+/// Listagem do índice: filtra por categoria e ordena pelos quatro critérios.
+/// A consulta é montada à mão porque as macros não constroem `ORDER BY`.
+async fn list_communities(
     pool: &PgPool,
     storage: &dyn StorageService,
-    cursor: Option<Uuid>,
+    category: Option<CommunityCategory>,
+    sort: CommunitySort,
+    cursor: Option<&str>,
     limit: i64,
 ) -> Result<(Vec<CommunitySummary>, Option<String>), actix_web::Error> {
-    let mut results = sqlx::query_as!(
-        CommunitySummary,
+    let mut query = QueryBuilder::<Postgres>::new(
         r#"
-        SELECT
-            c.id,
-            c.slug,
-            c.name,
-            c.description,
-            c.avatar_url,
-            c.is_private,
-            (
-                SELECT COUNT(*) FROM community_member cm
-                INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'
-                WHERE cm.community_id = c.id
-            ) AS "members_count!"
-        FROM community c
-        WHERE c.deleted_at IS NULL
-          AND ($1::uuid IS NULL OR c.id < $1::uuid)
-        ORDER BY c.id DESC
-        LIMIT $2
+        SELECT * FROM (
+            SELECT
+                c.id,
+                c.slug,
+                c.name,
+                c.description,
+                c.avatar_url,
+                c.category,
+                c.is_private,
+                (
+                    SELECT COUNT(*) FROM community_member cm
+                    INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'
+                    WHERE cm.community_id = c.id
+                ) AS members_count
+            FROM community c
+            WHERE c.deleted_at IS NULL
         "#,
-        cursor,
-        limit + 1,
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(db_err)?;
+    );
+
+    if let Some(category) = category {
+        query.push(" AND c.category = ");
+        query.push_bind(category);
+    }
+
+    query.push(") t WHERE TRUE");
+
+    match sort {
+        CommunitySort::CreatedAtDesc | CommunitySort::CreatedAtAsc => {
+            if let Some(id) = cursor.and_then(|cursor| cursor.parse::<Uuid>().ok()) {
+                let comparison = if sort == CommunitySort::CreatedAtDesc {
+                    " AND t.id < "
+                } else {
+                    " AND t.id > "
+                };
+                query.push(comparison);
+                query.push_bind(id);
+            }
+        }
+        CommunitySort::MembersDesc | CommunitySort::MembersAsc => {
+            if let Some((count, id)) = parse_members_cursor(cursor) {
+                let comparison = if sort == CommunitySort::MembersDesc {
+                    " AND (t.members_count, t.id) < ("
+                } else {
+                    " AND (t.members_count, t.id) > ("
+                };
+                query.push(comparison);
+                query.push_bind(count);
+                query.push(", ");
+                query.push_bind(id);
+                query.push(")");
+            }
+        }
+    }
+
+    query.push(match sort {
+        CommunitySort::CreatedAtDesc => " ORDER BY t.id DESC",
+        CommunitySort::CreatedAtAsc => " ORDER BY t.id ASC",
+        CommunitySort::MembersDesc => " ORDER BY t.members_count DESC, t.id DESC",
+        CommunitySort::MembersAsc => " ORDER BY t.members_count ASC, t.id ASC",
+    });
+
+    query.push(" LIMIT ");
+    query.push_bind(limit + 1);
+
+    let mut results: Vec<CommunitySummary> = query
+        .build_query_as()
+        .fetch_all(pool)
+        .await
+        .map_err(db_err)?;
 
     for community in &mut results {
         community.avatar_url = public_url_of(storage, community.avatar_url.take());
     }
 
-    let next_cursor = take_page(&mut results, limit, |community| community.id.to_string());
+    let counts_in_cursor = sort.counts_in_cursor();
+    let next_cursor = take_page(&mut results, limit, |community| {
+        if counts_in_cursor {
+            format!("{}:{}", community.members_count, community.id)
+        } else {
+            community.id.to_string()
+        }
+    });
 
     Ok((results, next_cursor))
 }
@@ -236,9 +365,11 @@ async fn recent_communities(
 #[utoipa::path(
     get,
     path = "/api/v1/community",
-    description = "Busca comunidades por nome (similaridade) ou prefixo do slug. Sem o termo, lista as mais recentes",
+    description = "Busca comunidades por nome (similaridade) ou prefixo do slug. Sem o termo, devolve o índice, que aceita filtro por categoria e ordenação",
     params(
         ("q" = Option<String>, Query, description = "Termo buscado, mínimo de 2 caracteres"),
+        ("category" = Option<CommunityCategory>, Query, description = "Categoria do índice, ignorada quando há busca por termo"),
+        ("sort" = Option<String>, Query, description = "created_at_desc (padrão), created_at_asc, members_desc ou members_asc"),
         CursorPaginationQuery,
     ),
     responses(
@@ -260,6 +391,20 @@ pub async fn get(
         .map(|term| term.trim().to_lowercase())
         .filter(|term| !term.is_empty());
 
+    let sort = match query.sort.as_deref() {
+        None => CommunitySort::CreatedAtDesc,
+        Some(value) => match CommunitySort::parse(value) {
+            Some(sort) => sort,
+            None => {
+                return Ok(invalid_field(
+                    "sort",
+                    "invalid_sort",
+                    "A ordenação precisa ser 'created_at_desc', 'created_at_asc', 'members_desc' ou 'members_asc'.",
+                ));
+            }
+        },
+    };
+
     let (results, next_cursor) = match term {
         Some(term) if term.chars().count() >= MIN_SEARCH_LENGTH => {
             search_communities(
@@ -279,10 +424,12 @@ pub async fn get(
             ));
         }
         None => {
-            recent_communities(
+            list_communities(
                 pool.get_ref(),
                 storage.as_ref().as_ref(),
-                pagination.cursor_id(),
+                query.category,
+                sort,
+                pagination.cursor.as_deref(),
                 limit,
             )
             .await?
@@ -336,6 +483,7 @@ pub async fn post(
         &mut tx,
         payload.name.trim(),
         description,
+        payload.category,
         payload.is_private,
     )
     .await?;

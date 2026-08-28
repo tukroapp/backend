@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            category AS \"category: CommunityCategory\",\n            COUNT(*) AS \"count!\"\n        FROM community\n        WHERE deleted_at IS NULL\n        GROUP BY category\n        ORDER BY COUNT(*) DESC, category\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "category: CommunityCategory",
+        "type_info": {
+          "Custom": {
+            "name": "community_category",
+            "kind": {
+              "Enum": [
+                "alunos_e_ex_alunos",
+                "artes_e_entretenimento",
+                "atividades",
+                "cidades_e_bairros",
+                "computadores_e_internet",
+                "culinaria",
+                "empresas",
+                "escolas",
+                "esportes_e_lazer",
+                "estilo_de_vida",
+                "familias_e_lar",
+                "filosofia_e_religiao",
+                "governo_e_politica",
+                "historia_e_ciencia",
+                "jogos",
+                "musica",
+                "paises_e_regionalismo",
+                "pessoas",
+                "saude_e_bem_estar",
+                "viagens",
+                "outros"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "category"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "3681506f1baec30c7a23b371cdba26d9371676ea5e59c8c38097f5ec09ce8935"
+}

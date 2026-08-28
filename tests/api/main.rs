@@ -6,6 +6,7 @@ mod auth;
 mod birthday;
 mod block;
 mod community;
+mod community_discovery;
 mod fan;
 mod email_gate;
 mod feed;

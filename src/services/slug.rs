@@ -2,7 +2,10 @@ use anyhow::anyhow;
 use sqlx::{Acquire, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::utils::{db_err, e500, gen_random_string};
+use crate::{
+    routes::community::CommunityCategory,
+    utils::{db_err, e500, gen_random_string},
+};
 
 const SLUG_MAX_LENGTH: usize = 30;
 const SLUG_MIN_LENGTH: usize = 3;
@@ -95,6 +98,7 @@ pub async fn create_community(
     tx: &mut Transaction<'_, Postgres>,
     name: &str,
     description: Option<&str>,
+    category: CommunityCategory,
     is_private: bool,
 ) -> Result<(Uuid, String), actix_web::Error> {
     let base = normalize(name, COMMUNITY_SLUG_MAX_LENGTH);
@@ -112,13 +116,14 @@ pub async fn create_community(
 
         let result = sqlx::query_scalar!(
             r#"
-            INSERT INTO community (slug, name, description, is_private)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO community (slug, name, description, category, is_private)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             "#,
             candidate,
             name,
             description,
+            category as CommunityCategory,
             is_private,
         )
         .fetch_one(&mut *savepoint)

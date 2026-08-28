@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO community (slug, name, description, category, is_private)\n            VALUES ($1, $2, $3, $4, $5)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "community_category",
+            "kind": {
+              "Enum": [
+                "alunos_e_ex_alunos",
+                "artes_e_entretenimento",
+                "atividades",
+                "cidades_e_bairros",
+                "computadores_e_internet",
+                "culinaria",
+                "empresas",
+                "escolas",
+                "esportes_e_lazer",
+                "estilo_de_vida",
+                "familias_e_lar",
+                "filosofia_e_religiao",
+                "governo_e_politica",
+                "historia_e_ciencia",
+                "jogos",
+                "musica",
+                "paises_e_regionalismo",
+                "pessoas",
+                "saude_e_bem_estar",
+                "viagens",
+                "outros"
+              ]
+            }
+          }
+        },
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b77208c9182f1f3ccace5cbb5fda0bde79c748bff434a94f8e0a748eebe47246"
+}

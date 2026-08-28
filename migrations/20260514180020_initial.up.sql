@@ -64,6 +64,31 @@ CREATE TYPE approval_status AS ENUM(
     'rejected'
 );
 
+-- As categorias do Orkut clássico, na ordem em que ele as listava.
+CREATE TYPE community_category AS ENUM(
+    'alunos_e_ex_alunos',
+    'artes_e_entretenimento',
+    'atividades',
+    'cidades_e_bairros',
+    'computadores_e_internet',
+    'culinaria',
+    'empresas',
+    'escolas',
+    'esportes_e_lazer',
+    'estilo_de_vida',
+    'familias_e_lar',
+    'filosofia_e_religiao',
+    'governo_e_politica',
+    'historia_e_ciencia',
+    'jogos',
+    'musica',
+    'paises_e_regionalismo',
+    'pessoas',
+    'saude_e_bem_estar',
+    'viagens',
+    'outros'
+);
+
 CREATE TYPE community_role AS ENUM(
     'member',
     'admin',
@@ -438,6 +463,9 @@ CREATE TABLE community(
     name TEXT NOT NULL,
     description TEXT,
     avatar_url TEXT,
+    -- Obrigatória: é o que sustenta o índice de descoberta. Sem ela, tudo cairia
+    -- em 'outros' e a navegação por categoria não teria graça.
+    category community_category NOT NULL,
     is_private BOOLEAN NOT NULL DEFAULT FALSE,
     -- Remoção pela moderação. O dono continua excluindo de verdade pelo próprio
     -- endpoint; aqui a comunidade só sai do ar e pode voltar.
@@ -452,6 +480,11 @@ SELECT
     set_updated_at_for('community');
 
 CREATE INDEX idx_community_name_trgm ON community USING GIN(name gin_trgm_ops);
+
+-- Listagem por categoria, da mais nova para a mais antiga.
+CREATE INDEX idx_community_category ON community(category, id DESC)
+WHERE
+    deleted_at IS NULL;
 
 CREATE TABLE community_member(
     community_id UUID NOT NULL REFERENCES community(id) ON DELETE CASCADE,
