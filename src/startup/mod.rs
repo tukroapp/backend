@@ -40,6 +40,9 @@ pub struct AppState {
     pub google_user_info_uri: String,
     pub secret_key: String,
     pub media_dir: PathBuf,
+    /// Remetente de todo e-mail que sai. É a própria conta SMTP: mandar de um
+    /// endereço que não é o autenticado costuma cair em spam ou ser recusado.
+    pub from_email: String,
 }
 
 pub struct RunConfig {

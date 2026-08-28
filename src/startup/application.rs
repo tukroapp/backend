@@ -58,6 +58,7 @@ impl Application {
             backend_url: configuration.application.base_url,
             secret_key: configuration.application.secret_key,
             media_dir: media_dir.clone(),
+            from_email: configuration.email.smtp_username.clone(),
         };
 
         // Em desenvolvimento e nos testes os arquivos ficam no disco, servidos

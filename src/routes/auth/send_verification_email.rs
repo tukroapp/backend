@@ -53,6 +53,7 @@ pub async fn post(
 
     queue_verification_email(
         pool.get_ref(),
+        &app_state.from_email,
         &app_state.frontend_url,
         session.user_id,
         &user.email,
@@ -67,6 +68,7 @@ pub async fn post(
 /// porque o cadastro também dispara isso, sem passar por aqui.
 pub async fn queue_verification_email(
     pool: &PgPool,
+    from_email: &str,
     frontend_url: &str,
     user_id: Uuid,
     email: &str,
@@ -89,6 +91,7 @@ pub async fn queue_verification_email(
 
     EmailClient::queue_email_single(
         pool,
+        from_email,
         email,
         "Confirmação de e-mail",
         AccountConfirmationEmailTemplate {

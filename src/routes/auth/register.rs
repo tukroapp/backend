@@ -87,6 +87,7 @@ pub async fn post(
     // usuário ainda pode pedir o reenvio.
     if let Err(error) = queue_verification_email(
         pool.get_ref(),
+        &app_state.from_email,
         &app_state.frontend_url,
         user_id,
         &payload.email,

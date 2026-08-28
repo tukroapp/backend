@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use crate::constants::{
-    EMAIL_BATCH_SIZE, EMAIL_MAX_CONCURRENT, EMAIL_POLL_INTERVAL, FROM_EMAIL_ADDRESS,
-};
+use crate::constants::{EMAIL_BATCH_SIZE, EMAIL_MAX_CONCURRENT, EMAIL_POLL_INTERVAL};
 use askama::Template;
 use html2text::from_read;
 
@@ -25,6 +23,7 @@ pub struct EmailClient;
 impl EmailClient {
     pub async fn queue_email<T: Template>(
         pool: &PgPool,
+        from: &str,
         to: Vec<String>,
         cc: Option<Vec<String>>,
         bcc: Option<Vec<String>>,
@@ -49,7 +48,7 @@ impl EmailClient {
                 text_content
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
-            FROM_EMAIL_ADDRESS,
+            from,
             &to,
             &cc,
             &bcc,
@@ -65,11 +64,21 @@ impl EmailClient {
 
     pub async fn queue_email_single<T: Template>(
         pool: &PgPool,
+        from: &str,
         to: &str,
         subject: &str,
         template: T,
     ) -> Result<(), anyhow::Error> {
-        Self::queue_email(pool, vec![to.to_string()], None, None, subject, template).await
+        Self::queue_email(
+            pool,
+            from,
+            vec![to.to_string()],
+            None,
+            None,
+            subject,
+            template,
+        )
+        .await
     }
 }
 

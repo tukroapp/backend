@@ -7,7 +7,7 @@ use serde_json::json;
 use sqlx::{AssertSqlSafe, Connection, Executor, PgConnection, PgPool, postgres::PgPoolOptions};
 use std::sync::{LazyLock, RwLock};
 use tukro_backend::{
-    configuration::{DatabaseSettings, get_configuration},
+    configuration::{DatabaseSettings, Environment, get_configuration},
     startup::{Application, RedisPool, get_connection_pool, get_redis_pool},
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -314,6 +314,10 @@ pub async fn spawn_app() -> TestApp {
         let mut c = get_configuration().expect("Failed to read configuration.");
         c.database.database_name = database_name.clone();
         c.application.port = 0;
+        // O `cfg!(test)` do código não enxerga o teste de integração, que linka a
+        // lib compilada sem ele. Sem forçar aqui, um `.env` apontando para
+        // produção liga o rate limit e manda o upload para o S3.
+        c.application.environment = Environment::Development;
         c.application.google_auth_uri = format!("{}/auth", mock_google_server.uri());
         c.application.google_token_uri = format!("{}/token", mock_google_server.uri());
         c.application.google_user_info_uri = format!("{}/userinfo", mock_google_server.uri());

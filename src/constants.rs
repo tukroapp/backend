@@ -10,7 +10,6 @@ pub const USER_SESSIONS_REDIS_PREFIX: &str = "user_sessions:";
 
 pub const SESSION_TOKEN_LENGTH: usize = 48;
 
-pub const FROM_EMAIL_ADDRESS: &str = "some@email.com";
 pub const EMAIL_BATCH_SIZE: i64 = 10;
 pub const EMAIL_MAX_CONCURRENT: usize = 4;
 pub const EMAIL_POLL_INTERVAL: Duration = Duration::from_secs(10);

@@ -77,6 +77,7 @@ pub async fn post(
 
         EmailClient::queue_email_single(
             &pool,
+            &app_state.from_email,
             &email.clone(),
             "Redefinição de senha",
             ForgotPasswordTemplate {
