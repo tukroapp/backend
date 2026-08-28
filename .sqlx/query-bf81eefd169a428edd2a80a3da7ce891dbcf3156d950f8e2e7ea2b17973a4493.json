@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            a.id,\n            a.kind AS \"kind: ActivityKind\",\n            a.created_at,\n            a.text_value,\n            ap.user_id AS actor_id,\n            ap.slug AS actor_slug,\n            ap.name AS actor_name,\n            ap.avatar_url AS actor_avatar,\n            ap.status AS actor_status,\n            tu.user_id AS \"tu_id?\",\n            tu.slug AS \"tu_slug?\",\n            tu.name AS \"tu_name?\",\n            tu.avatar_url AS \"tu_avatar?\",\n            tu.status AS \"tu_status?\",\n            c.slug AS \"community_slug?\",\n            c.name AS \"community_name?\",\n            m.id AS \"media_id?\",\n            m.kind AS \"media_kind?: MediaKind\",\n            m.storage_key AS \"media_key?\"\n        FROM activity a\n        INNER JOIN auth_user au ON au.id = a.actor_id AND au.status = 'active'\n        INNER JOIN user_profile ap ON ap.user_id = a.actor_id\n        LEFT JOIN user_profile tu ON tu.user_id = a.target_user_id\n        LEFT JOIN community c ON c.id = a.community_id\n        LEFT JOIN user_media m ON m.id = a.media_id\n        WHERE a.actor_id <> $1\n          -- Comunidade removida pela moderação some do feed junto.\n          AND (a.community_id IS NULL OR c.deleted_at IS NULL)\n          AND (\n              (EXISTS (SELECT 1 FROM friend f WHERE f.user_id = $1 AND f.friend_id = a.actor_id)\n                  AND ap.profile_visibility <> 'nobody')\n              OR (EXISTS (SELECT 1 FROM fan WHERE fan.fan_id = $1 AND fan.idol_id = a.actor_id)\n                  AND ap.profile_visibility = 'everyone')\n          )\n          AND (\n              $2::timestamptz IS NULL\n              OR (a.created_at, a.id) < ($2::timestamptz, $3::uuid)\n          )\n        ORDER BY a.created_at DESC, a.id DESC\n        LIMIT $4\n        ",
+  "query": "\n        SELECT\n            a.id,\n            a.kind AS \"kind: ActivityKind\",\n            a.created_at,\n            a.text_value,\n            ap.user_id AS actor_id,\n            ap.slug AS actor_slug,\n            ap.name AS actor_name,\n            ap.avatar_url AS actor_avatar,\n            ap.status AS actor_status,\n            tu.user_id AS \"tu_id?\",\n            tu.slug AS \"tu_slug?\",\n            tu.name AS \"tu_name?\",\n            tu.avatar_url AS \"tu_avatar?\",\n            tu.status AS \"tu_status?\",\n            c.slug AS \"community_slug?\",\n            c.name AS \"community_name?\",\n            a.topic_id AS \"topic_id?\",\n            a.poll_id AS \"poll_id?\",\n            m.id AS \"media_id?\",\n            m.kind AS \"media_kind?: MediaKind\",\n            m.storage_key AS \"media_key?\"\n        FROM activity a\n        INNER JOIN auth_user au ON au.id = a.actor_id AND au.status = 'active'\n        INNER JOIN user_profile ap ON ap.user_id = a.actor_id\n        LEFT JOIN user_profile tu ON tu.user_id = a.target_user_id\n        LEFT JOIN community c ON c.id = a.community_id\n        LEFT JOIN user_media m ON m.id = a.media_id\n        WHERE a.actor_id <> $1\n          -- Comunidade removida pela moderação some do feed junto.\n          AND (a.community_id IS NULL OR c.deleted_at IS NULL)\n          -- O que acontece em comunidade privada só aparece para quem está\n          -- dentro, senão o feed vira janela para o que ela esconde.\n          AND (\n              a.community_id IS NULL\n              OR NOT c.is_private\n              OR EXISTS (\n                  SELECT 1 FROM community_member cm\n                  WHERE cm.community_id = a.community_id AND cm.user_id = $1\n              )\n          )\n          AND (\n              (EXISTS (SELECT 1 FROM friend f WHERE f.user_id = $1 AND f.friend_id = a.actor_id)\n                  AND ap.profile_visibility <> 'nobody')\n              OR (EXISTS (SELECT 1 FROM fan WHERE fan.fan_id = $1 AND fan.idol_id = a.actor_id)\n                  AND ap.profile_visibility = 'everyone')\n          )\n          AND (\n              $2::timestamptz IS NULL\n              OR (a.created_at, a.id) < ($2::timestamptz, $3::uuid)\n          )\n        ORDER BY a.created_at DESC, a.id DESC\n        LIMIT $4\n        ",
   "describe": {
     "columns": [
       {
@@ -25,6 +25,8 @@
                 "testimonial_received",
                 "community_joined",
                 "community_created",
+                "topic_created",
+                "poll_created",
                 "became_fan",
                 "friendship_made",
                 "media_added",
@@ -196,6 +198,28 @@
       },
       {
         "ordinal": 16,
+        "name": "topic_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "activity",
+            "name": "topic_id"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "poll_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "activity",
+            "name": "poll_id"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
         "name": "media_id?",
         "type_info": "Uuid",
         "origin": {
@@ -206,7 +230,7 @@
         }
       },
       {
-        "ordinal": 17,
+        "ordinal": 19,
         "name": "media_kind?: MediaKind",
         "type_info": {
           "Custom": {
@@ -227,7 +251,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 20,
         "name": "media_key?",
         "type_info": "Text",
         "origin": {
@@ -263,10 +287,12 @@
       true,
       false,
       false,
+      true,
+      true,
       false,
       false,
       false
     ]
   },
-  "hash": "de7bf7e1efc99706748137a360109217b955fa57cfa85154bc890a7479573a26"
+  "hash": "bf81eefd169a428edd2a80a3da7ce891dbcf3156d950f8e2e7ea2b17973a4493"
 }

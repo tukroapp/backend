@@ -103,6 +103,10 @@ CREATE TYPE media_kind AS ENUM(
 CREATE TYPE notification_kind AS ENUM(
     'friend_request',
     'friend_accepted',
+    -- Avisa que há gente nova te achando. Não é uma por fã: o handler segura a
+    -- criação enquanto houver uma não lida, senão um perfil viral geraria
+    -- centenas de milhares de linhas na caixa de uma pessoa só.
+    'new_fan',
     'scrap_received',
     'scrap_reply',
     'testimonial_received',
@@ -140,6 +144,11 @@ CREATE TYPE activity_kind AS ENUM(
     'testimonial_received',
     'community_joined',
     'community_created',
+    -- A vida das comunidades no feed. Fica só aqui, que é leitura por quem
+    -- segue, e não vira notificação: avisar todos os membros seria um insert
+    -- por membro numa única requisição.
+    'topic_created',
+    'poll_created',
     'became_fan',
     'friendship_made',
     'media_added',
@@ -779,6 +788,8 @@ CREATE TABLE activity(
     community_id UUID REFERENCES community(id) ON DELETE CASCADE,
     media_id UUID REFERENCES user_media(id) ON DELETE CASCADE,
     testimonial_id UUID REFERENCES testimonial(id) ON DELETE CASCADE,
+    topic_id UUID REFERENCES community_topic(id) ON DELETE CASCADE,
+    poll_id UUID REFERENCES community_poll(id) ON DELETE CASCADE,
     text_value TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

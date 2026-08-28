@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO notification (user_id, actor_id, kind)\n        SELECT $1, $2, 'new_fan'\n        WHERE NOT EXISTS (\n            SELECT 1 FROM notification\n            WHERE user_id = $1 AND kind = 'new_fan' AND read_at IS NULL\n        )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fce24eaea296bc6eeccd433158c3c227f7a8962e77f9dd9323eb6d14da250525"
+}

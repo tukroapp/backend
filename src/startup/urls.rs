@@ -172,6 +172,7 @@ fn profile_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         .service(resource("/{slug}/community").route(get().to(profile::slug::communities::get)))
         .service(resource("/{slug}/media").route(get().to(profile::slug::media::get)))
         .service(resource("/{slug}/message").route(post().to(profile::slug::messages::post)))
+        .service(resource("/{slug}/idol").route(get().to(profile::slug::fans::idols)))
         .service(
             resource("/{slug}/fan")
                 .route(get().to(profile::slug::fans::get))

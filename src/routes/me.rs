@@ -607,11 +607,13 @@ pub async fn visitor(
     .map_err(db_err)?;
 
     if !enabled {
-        return Ok(HttpResponse::Ok().json(ApiResponse::new(ProfileVisitorsResponse {
-            enabled: false,
-            count_30d: 0,
-            recent: Vec::new(),
-        })));
+        return Ok(
+            HttpResponse::Ok().json(ApiResponse::new(ProfileVisitorsResponse {
+                enabled: false,
+                count_30d: 0,
+                recent: Vec::new(),
+            })),
+        );
     }
 
     let (count_30d, entries) = recent_visitors(&redis, session.user_id).await;
@@ -667,11 +669,13 @@ pub async fn visitor(
         })
         .collect();
 
-    Ok(HttpResponse::Ok().json(ApiResponse::new(ProfileVisitorsResponse {
-        enabled: true,
-        count_30d,
-        recent,
-    })))
+    Ok(
+        HttpResponse::Ok().json(ApiResponse::new(ProfileVisitorsResponse {
+            enabled: true,
+            count_30d,
+            recent,
+        })),
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -807,18 +811,26 @@ pub async fn birthday(
     })))
 }
 
+/// Teto de cada contador. O endpoint é pollado a cada 30 segundos, então a
+/// consulta não pode crescer junto da caixa: quem tem 300 mil não lidas paga o
+/// mesmo que quem tem 100. O front mostra "99+" quando bate no teto.
+const UNREAD_COUNT_CAP: i64 = 100;
+
 #[derive(Serialize, ToSchema)]
 pub struct UnreadResponse {
+    /// Vai até 100. Chegou em 100, há 100 ou mais.
     pub notifications: i64,
+    /// Mesmo teto.
     pub messages: i64,
-    /// Atividades no feed mais novas que o `feed_seen_at` do usuário.
+    /// Atividades no feed mais novas que o `feed_seen_at` do usuário, com o
+    /// mesmo teto.
     pub feed: i64,
 }
 
 #[utoipa::path(
     get,
     path = "/api/v1/me/unread",
-    description = "Contadores para os badges. Endpoint leve, feito para polling a cada 30s",
+    description = "Contadores para os badges, cada um limitado a 100. Endpoint leve, feito para polling a cada 30s",
     responses(
         (status = 200, description = "Contadores de não lidas", body = ApiResponse<UnreadResponse>),
         (status = 401, description = "Não autenticado", body = ApiErrorResponse),
@@ -833,7 +845,8 @@ pub async fn unread(
         r#"
         SELECT
             (
-                SELECT COUNT(*) FROM notification n
+                SELECT COUNT(*) FROM (
+                SELECT 1 FROM notification n
                 LEFT JOIN scrap s ON s.id = n.scrap_id
                 LEFT JOIN testimonial t ON t.id = n.testimonial_id
                 WHERE n.user_id = $1
@@ -845,17 +858,23 @@ pub async fn unread(
                       WHERE (b.blocker_id = n.user_id AND b.blocked_id = n.actor_id)
                          OR (b.blocker_id = n.actor_id AND b.blocked_id = n.user_id)
                   )
+                LIMIT $2
+                ) AS capped
             ) AS "notifications!",
             (
-                SELECT COUNT(*) FROM message m
+                SELECT COUNT(*) FROM (
+                SELECT 1 FROM message m
                 INNER JOIN conversation_participant cp
                     ON cp.conversation_id = m.conversation_id AND cp.user_id = $1
                 WHERE m.sender_id <> $1
                   AND m.created_at > cp.last_read_at
                   AND (cp.hidden_at IS NULL OR m.created_at > cp.hidden_at)
+                LIMIT $2
+                ) AS capped
             ) AS "messages!",
             (
-                SELECT COUNT(*) FROM activity a
+                SELECT COUNT(*) FROM (
+                SELECT 1 FROM activity a
                 INNER JOIN auth_user au ON au.id = a.actor_id AND au.status = 'active'
                 INNER JOIN user_profile ap ON ap.user_id = a.actor_id
                 WHERE a.actor_id <> $1
@@ -866,9 +885,12 @@ pub async fn unread(
                       OR (EXISTS (SELECT 1 FROM fan WHERE fan.fan_id = $1 AND fan.idol_id = a.actor_id)
                           AND ap.profile_visibility = 'everyone')
                   )
+                LIMIT $2
+                ) AS capped
             ) AS "feed!"
         "#,
         session.user_id,
+        UNREAD_COUNT_CAP,
     )
     .fetch_one(pool.get_ref())
     .await

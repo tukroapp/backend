@@ -24,6 +24,7 @@ mod rating;
 mod report;
 mod seed_admin;
 mod scrap;
+mod social_edges;
 mod testimonial;
 mod top_friends;
 mod topic;

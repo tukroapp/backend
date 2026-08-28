@@ -17,6 +17,7 @@ use crate::{
     services::{
         activity::{NewActivity, record_activity},
         auth::SessionData,
+        notification::notify_new_fan,
         storage::{StorageService, public_url_of},
     },
     utils::{
@@ -111,6 +112,69 @@ pub async fn get(
 }
 
 #[utoipa::path(
+    get,
+    path = "/api/v1/profile/{slug}/idol",
+    description = "Lista paginada (cursor) de quem esse perfil é fã, o outro lado do /fan",
+    params(
+        ("slug" = String, Path, description = "Slug público do perfil"),
+        CursorPaginationQuery,
+    ),
+    responses(
+        (status = 200, description = "Ídolos do perfil", body = ApiCursorPaginatedResponse<Vec<ProfileSummary>>),
+        (status = 404, description = "Perfil não encontrado ou conta inativa", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Lista os ídolos de um perfil", skip_all)]
+pub async fn idols(
+    slug: Path<String>,
+    pagination: Query<CursorPaginationQuery>,
+    session: Option<SessionData>,
+    pool: Data<PgPool>,
+    storage: Data<Arc<dyn StorageService>>,
+) -> Result<impl Responder, actix_web::Error> {
+    let viewer = session.map(|session| session.user_id);
+
+    let Some(target) = fetch_target(pool.get_ref(), &slug.into_inner(), viewer).await? else {
+        return Ok(profile_not_found());
+    };
+
+    let limit = pagination.limit();
+
+    let mut idols = sqlx::query_as!(
+        ProfileSummary,
+        r#"
+        SELECT
+            up.user_id AS id,
+            up.slug,
+            up.name,
+            up.avatar_url,
+            up.status
+        FROM fan
+        INNER JOIN auth_user au ON au.id = fan.idol_id AND au.status = 'active'
+        INNER JOIN user_profile up ON up.user_id = fan.idol_id
+        WHERE fan.fan_id = $1
+          AND ($2::uuid IS NULL OR fan.idol_id < $2::uuid)
+        ORDER BY fan.idol_id DESC
+        LIMIT $3
+        "#,
+        target.user_id,
+        pagination.cursor_id(),
+        limit + 1,
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    for idol in &mut idols {
+        idol.avatar_url = public_url_of(storage.as_ref().as_ref(), idol.avatar_url.take());
+    }
+
+    let next_cursor = take_page(&mut idols, limit, |idol| idol.id.to_string());
+
+    Ok(HttpResponse::Ok().json(ApiCursorPaginatedResponse::new(idols, next_cursor)))
+}
+
+#[utoipa::path(
     post,
     path = "/api/v1/profile/{slug}/fan",
     description = "Torna quem está logado fã do perfil. Idempotente, não exige amizade",
@@ -169,6 +233,10 @@ pub async fn post(
         )
         .await
         .map_err(db_err)?;
+
+        notify_new_fan(pool.get_ref(), target.user_id, session.user_id)
+            .await
+            .map_err(db_err)?;
     }
 
     let fans_count = fans_count(pool.get_ref(), target.user_id).await?;

@@ -15,6 +15,7 @@ pub enum NotificationKind {
     CommunityJoinAccepted,
     TopicComment,
     TopicReply,
+    NewFan,
 }
 
 /// O que originou a notificação. A tabela tem uma coluna por tipo de alvo, e
@@ -104,6 +105,38 @@ pub async fn notify_community_moderators(
         community_id,
         actor_id,
         kind as NotificationKind,
+    )
+    .execute(executor)
+    .await?;
+
+    Ok(())
+}
+
+/// Avisa que apareceu gente nova querendo ser fã. Diferente das outras, não é
+/// uma notificação por evento: enquanto o ídolo não ler a que já está lá,
+/// nenhuma outra é criada. Sem isso, um perfil que viraliza colocaria uma linha
+/// por fã na caixa de uma pessoa só, e o contador de não lidas do polling
+/// passaria a varrer tudo isso a cada consulta.
+pub async fn notify_new_fan(
+    executor: impl PgExecutor<'_>,
+    idol_id: Uuid,
+    fan_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    if idol_id == fan_id {
+        return Ok(());
+    }
+
+    sqlx::query!(
+        r#"
+        INSERT INTO notification (user_id, actor_id, kind)
+        SELECT $1, $2, 'new_fan'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM notification
+            WHERE user_id = $1 AND kind = 'new_fan' AND read_at IS NULL
+        )
+        "#,
+        idol_id,
+        fan_id,
     )
     .execute(executor)
     .await?;

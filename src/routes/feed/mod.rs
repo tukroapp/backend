@@ -41,8 +41,12 @@ pub struct FeedItem {
     /// quando o `kind` não usa.
     pub target_user: Option<ProfileSummary>,
     pub community: Option<FeedCommunity>,
+    /// Id do tópico ou da enquete criada, para o link. O título vem no `text`.
+    pub topic_id: Option<Uuid>,
+    pub poll_id: Option<Uuid>,
     pub media: Option<FeedMedia>,
-    /// Texto do novo recado, no `status_changed`.
+    /// Texto do novo recado no `status_changed`, título do tópico no
+    /// `topic_created` e pergunta no `poll_created`.
     pub text: Option<String>,
 }
 
@@ -95,6 +99,8 @@ pub async fn list(
             tu.status AS "tu_status?",
             c.slug AS "community_slug?",
             c.name AS "community_name?",
+            a.topic_id AS "topic_id?",
+            a.poll_id AS "poll_id?",
             m.id AS "media_id?",
             m.kind AS "media_kind?: MediaKind",
             m.storage_key AS "media_key?"
@@ -107,6 +113,16 @@ pub async fn list(
         WHERE a.actor_id <> $1
           -- Comunidade removida pela moderação some do feed junto.
           AND (a.community_id IS NULL OR c.deleted_at IS NULL)
+          -- O que acontece em comunidade privada só aparece para quem está
+          -- dentro, senão o feed vira janela para o que ela esconde.
+          AND (
+              a.community_id IS NULL
+              OR NOT c.is_private
+              OR EXISTS (
+                  SELECT 1 FROM community_member cm
+                  WHERE cm.community_id = a.community_id AND cm.user_id = $1
+              )
+          )
           AND (
               (EXISTS (SELECT 1 FROM friend f WHERE f.user_id = $1 AND f.friend_id = a.actor_id)
                   AND ap.profile_visibility <> 'nobody')
@@ -142,6 +158,9 @@ pub async fn list(
                 status: row.tu_status,
             });
 
+            let topic_id = row.topic_id;
+            let poll_id = row.poll_id;
+
             let community = match (row.community_slug, row.community_name) {
                 (Some(slug), Some(name)) => Some(FeedCommunity { slug, name }),
                 _ => None,
@@ -169,6 +188,8 @@ pub async fn list(
                 },
                 target_user,
                 community,
+                topic_id,
+                poll_id,
                 media,
                 text: row.text_value,
             }

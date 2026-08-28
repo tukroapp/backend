@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO activity\n            (actor_id, kind, target_user_id, community_id, media_id, testimonial_id, text_value)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        ",
+  "query": "\n        INSERT INTO activity\n            (actor_id, kind, target_user_id, community_id, media_id, testimonial_id,\n             topic_id, poll_id, text_value)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n        ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -14,6 +14,8 @@
                 "testimonial_received",
                 "community_joined",
                 "community_created",
+                "topic_created",
+                "poll_created",
                 "became_fan",
                 "friendship_made",
                 "media_added",
@@ -26,10 +28,12 @@
         "Uuid",
         "Uuid",
         "Uuid",
+        "Uuid",
+        "Uuid",
         "Text"
       ]
     },
     "nullable": []
   },
-  "hash": "fe908a428e19079f7092c8254dac3f98b495b7cb99fa3666a0dece688ff4fc3b"
+  "hash": "95e353bef942bbca1b422f7f3d24f1433e8f99aa90db7b4f3a253b9a63c31f14"
 }

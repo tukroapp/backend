@@ -21,6 +21,7 @@ use crate::{
         profile::ProfileSummary,
     },
     services::{
+        activity::{NewActivity, record_activity},
         auth::SessionData,
         storage::{StorageService, public_url_of},
     },
@@ -292,6 +293,14 @@ pub async fn post(
     .map_err(db_err)?;
 
     tx.commit().await.map_err(db_err)?;
+
+    // Mesma regra do tópico: entra no feed de quem segue, não vira notificação
+    // para a comunidade inteira.
+    let activity =
+        NewActivity::poll_created(session.user_id, target.id, poll_id, payload.question.trim());
+    if let Err(error) = record_activity(pool.get_ref(), activity).await {
+        tracing::error!(%error, "failed to record the poll activity");
+    }
 
     let poll_target = fetch_poll_target(pool.get_ref(), poll_id, Some(session.user_id))
         .await?

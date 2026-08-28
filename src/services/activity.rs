@@ -13,6 +13,8 @@ pub enum ActivityKind {
     TestimonialReceived,
     CommunityJoined,
     CommunityCreated,
+    TopicCreated,
+    PollCreated,
     BecameFan,
     FriendshipMade,
     MediaAdded,
@@ -28,6 +30,8 @@ pub struct NewActivity {
     pub community_id: Option<Uuid>,
     pub media_id: Option<Uuid>,
     pub testimonial_id: Option<Uuid>,
+    pub topic_id: Option<Uuid>,
+    pub poll_id: Option<Uuid>,
     pub text_value: Option<String>,
 }
 
@@ -40,6 +44,8 @@ impl NewActivity {
             community_id: None,
             media_id: None,
             testimonial_id: None,
+            topic_id: None,
+            poll_id: None,
             text_value: None,
         }
     }
@@ -63,6 +69,24 @@ impl NewActivity {
         Self {
             community_id: Some(community_id),
             ..Self::base(actor, ActivityKind::CommunityCreated)
+        }
+    }
+
+    pub fn topic_created(actor: Uuid, community_id: Uuid, topic_id: Uuid, title: &str) -> Self {
+        Self {
+            community_id: Some(community_id),
+            topic_id: Some(topic_id),
+            text_value: Some(title.to_string()),
+            ..Self::base(actor, ActivityKind::TopicCreated)
+        }
+    }
+
+    pub fn poll_created(actor: Uuid, community_id: Uuid, poll_id: Uuid, question: &str) -> Self {
+        Self {
+            community_id: Some(community_id),
+            poll_id: Some(poll_id),
+            text_value: Some(question.to_string()),
+            ..Self::base(actor, ActivityKind::PollCreated)
         }
     }
 
@@ -104,8 +128,9 @@ pub async fn record_activity(
     sqlx::query!(
         r#"
         INSERT INTO activity
-            (actor_id, kind, target_user_id, community_id, media_id, testimonial_id, text_value)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+            (actor_id, kind, target_user_id, community_id, media_id, testimonial_id,
+             topic_id, poll_id, text_value)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         "#,
         activity.actor_id,
         activity.kind as ActivityKind,
@@ -113,6 +138,8 @@ pub async fn record_activity(
         activity.community_id,
         activity.media_id,
         activity.testimonial_id,
+        activity.topic_id,
+        activity.poll_id,
         activity.text_value,
     )
     .execute(executor)

@@ -52,6 +52,7 @@ use crate::routes::{
         profile::slug::get,
         profile::slug::friends::get,
         profile::slug::fans::get,
+        profile::slug::fans::idols,
         profile::slug::fans::post,
         profile::slug::fans::delete,
 

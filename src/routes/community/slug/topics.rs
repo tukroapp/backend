@@ -16,6 +16,7 @@ use crate::{
         topic::{TopicRequest, TopicResponse, member_required},
     },
     services::{
+        activity::{NewActivity, record_activity},
         auth::SessionData,
         storage::{StorageService, public_url_of},
     },
@@ -265,6 +266,13 @@ pub async fn post(
     .fetch_one(pool.get_ref())
     .await
     .map_err(db_err)?;
+
+    // Só o feed sabe do tópico novo: notificar cada membro da comunidade seria
+    // um insert por membro numa requisição só.
+    let activity = NewActivity::topic_created(session.user_id, target.id, row.id, &row.title);
+    if let Err(error) = record_activity(pool.get_ref(), activity).await {
+        tracing::error!(%error, "failed to record the topic activity");
+    }
 
     let topic = TopicResponse {
         id: row.id,
