@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM activity WHERE actor_id = $1 OR target_user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fee98917c9da55bacebc281d9824159b295fb16a5c8c187fe03ed40d084a8303"
+}

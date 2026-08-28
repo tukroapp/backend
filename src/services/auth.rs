@@ -135,6 +135,8 @@ pub enum AccountStatus {
     Active,
     Suspended,
     Deactivated,
+    /// Conta já anonimizada pelo pedido de exclusão. Não volta.
+    Deleted,
 }
 
 /// Suspensão em vigor, do jeito que o usuário barrado precisa ver: `until` nulo
@@ -216,6 +218,11 @@ pub async fn ensure_account_can_login(
     match status {
         AccountStatus::Active => Ok(()),
         AccountStatus::Deactivated => Ok(reactivate_account(user_id, transaction).await?),
+        // A conta anonimizada não tem mais credencial nem e-mail real, então na
+        // prática ninguém chega aqui. O braço existe para o dia em que chegar.
+        AccountStatus::Deleted => Err(LoginError::Other(e500(anyhow::anyhow!(
+            "login attempt on a deleted account"
+        )))),
         AccountStatus::Suspended => match suspended_until {
             Some(until) if until <= Utc::now() => {
                 Ok(reactivate_account(user_id, transaction).await?)
@@ -228,7 +235,8 @@ pub async fn ensure_account_can_login(
     }
 }
 
-/// Devolve a conta ao ar, seja saída voluntária ou suspensão já vencida.
+/// Devolve a conta ao ar, seja saída voluntária ou suspensão já vencida. É aqui
+/// que o pedido de exclusão é cancelado: entrar de novo dentro do prazo desfaz.
 async fn reactivate_account(
     user_id: &Uuid,
     transaction: &mut Transaction<'static, Postgres>,
@@ -240,7 +248,8 @@ async fn reactivate_account(
             status_reason = NULL,
             suspended_until = NULL,
             status_changed_at = NOW(),
-            status_changed_by = NULL
+            status_changed_by = NULL,
+            deletion_scheduled_at = NULL
         WHERE id = $1
         "#,
         user_id

@@ -105,6 +105,8 @@ pub async fn list(
         LEFT JOIN community c ON c.id = a.community_id
         LEFT JOIN user_media m ON m.id = a.media_id
         WHERE a.actor_id <> $1
+          -- Comunidade removida pela moderação some do feed junto.
+          AND (a.community_id IS NULL OR c.deleted_at IS NULL)
           AND (
               (EXISTS (SELECT 1 FROM friend f WHERE f.user_id = $1 AND f.friend_id = a.actor_id)
                   AND ap.profile_visibility <> 'nobody')

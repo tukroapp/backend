@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM conversation\n        WHERE user_lo = $1 OR user_hi = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "295700ddf2081d65d62ff6678861063f9b5136745fad17ca17afaefffc408b41"
+}

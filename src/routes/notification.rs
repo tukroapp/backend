@@ -130,6 +130,8 @@ pub async fn get(
         LEFT JOIN community topic_community ON topic_community.id = topic.community_id
         LEFT JOIN auth_user actor_account ON actor_account.id = n.actor_id
         WHERE n.user_id = $1
+          AND (n.community_id IS NULL OR c.deleted_at IS NULL)
+          AND (topic.community_id IS NULL OR topic_community.deleted_at IS NULL)
           -- Notificação de quem saiu do ar some da caixa, como o bloqueio faz.
           AND (n.actor_id IS NULL OR actor_account.status = 'active')
           AND (NOT $2 OR n.read_at IS NULL)

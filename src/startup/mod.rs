@@ -12,7 +12,7 @@ use crate::{
     configuration::{EmailSettings, Environment},
     constants::MAX_UPLOAD_SIZE_BYTES,
     middlewares::common,
-    services::{email::EmailWorker, storage::StorageService},
+    services::{account::DeletionWorker, email::EmailWorker, storage::StorageService},
     utils::{
         CustomIpExtractor, UserSessionExtractor, json_parse_config, multipart_parse_config,
         not_found_service, path_parse_config, query_parse_config,
@@ -83,6 +83,13 @@ pub fn run(config: RunConfig) -> Result<Server, std::io::Error> {
 
     if !is_dev {
         tokio::spawn(async move { worker.run().await });
+
+        let deletion_worker = DeletionWorker::new(
+            db_pool.as_ref().clone(),
+            redis_pool.as_ref().clone(),
+            Arc::clone(storage_data.as_ref()),
+        );
+        tokio::spawn(async move { deletion_worker.run().await });
     }
 
     let strict_rate_limit_config = GovernorConfigBuilder::default()

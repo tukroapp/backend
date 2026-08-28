@@ -1,0 +1,208 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            n.id,\n            n.kind::TEXT AS \"kind!\",\n            n.created_at,\n            n.read_at,\n            n.scrap_id,\n            n.testimonial_id,\n            n.friend_request_id,\n            n.community_id,\n            n.topic_id,\n            n.comment_id,\n            COALESCE(c.slug, topic_community.slug) AS \"community_slug?\",\n            actor.user_id AS \"actor_id?\",\n            actor.slug AS \"actor_slug?\",\n            actor.name AS \"actor_name?\",\n            actor.avatar_url AS \"actor_avatar_url?\",\n            actor.status AS \"actor_status?\",\n            COALESCE(wall.slug, subject.slug, actor.slug) AS \"target_slug!\"\n        FROM notification n\n        LEFT JOIN user_profile actor ON actor.user_id = n.actor_id\n        LEFT JOIN scrap s ON s.id = n.scrap_id\n        LEFT JOIN user_profile wall ON wall.user_id = s.profile_id\n        LEFT JOIN testimonial t ON t.id = n.testimonial_id\n        LEFT JOIN user_profile subject ON subject.user_id = t.profile_id\n        LEFT JOIN community c ON c.id = n.community_id\n        LEFT JOIN community_topic topic ON topic.id = n.topic_id\n        LEFT JOIN community topic_community ON topic_community.id = topic.community_id\n        LEFT JOIN auth_user actor_account ON actor_account.id = n.actor_id\n        WHERE n.user_id = $1\n          AND (n.community_id IS NULL OR c.deleted_at IS NULL)\n          AND (topic.community_id IS NULL OR topic_community.deleted_at IS NULL)\n          -- Notificação de quem saiu do ar some da caixa, como o bloqueio faz.\n          AND (n.actor_id IS NULL OR actor_account.status = 'active')\n          AND (NOT $2 OR n.read_at IS NULL)\n          -- Conteúdo apagado leva a notificação junto, como fazia o CASCADE\n          -- antes do soft delete.\n          AND s.deleted_at IS NULL\n          AND t.deleted_at IS NULL\n          AND topic.deleted_at IS NULL\n          AND ($3::uuid IS NULL OR n.id < $3::uuid)\n          AND NOT EXISTS (\n              SELECT 1 FROM block b\n              WHERE (b.blocker_id = n.user_id AND b.blocked_id = n.actor_id)\n                 OR (b.blocker_id = n.actor_id AND b.blocked_id = n.user_id)\n          )\n        ORDER BY n.id DESC\n        LIMIT $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "read_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "read_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "scrap_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "scrap_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "testimonial_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "testimonial_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "friend_request_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "friend_request_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "community_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "community_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "topic_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "topic_id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "comment_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "notification",
+            "name": "comment_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "community_slug?",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
+        "name": "actor_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "actor_slug?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "actor_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "actor_avatar_url?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "actor_status?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "target_slug!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "f91ff90b4d492d4da2c5e2480537f12232e040b0e07c43809e32b270fbf92b4e"
+}

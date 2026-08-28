@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE community_poll p\n            SET deleted_at = NOW()\n            WHERE p.id = $1 AND p.deleted_at IS NULL\n            RETURNING\n                p.question,\n                p.author_id,\n                (SELECT up.slug FROM user_profile up WHERE up.user_id = p.author_id) AS \"slug!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "question",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "question"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "author_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "author_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "80fbf48cdbe8ee6939200f98c342fc92a79791a4a2ddb7529e83fa11507f734c"
+}

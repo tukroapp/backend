@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO moderation_log (\n            moderator_id, action, report_id, reason, content_snapshot,\n            target_user_id, target_label,\n            scrap_id, testimonial_id, community_id, topic_id, comment_id, poll_id\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "moderation_action",
+            "kind": {
+              "Enum": [
+                "content_removed",
+                "content_restored",
+                "user_suspended",
+                "user_unsuspended"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0d31a1c33ce77689ffcdd89067edaf81952c831ab3e215fff7948d34dce7d3eb"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE auth_user\n        SET status = 'deactivated',\n            status_reason = NULL,\n            suspended_until = NULL,\n            status_changed_at = NOW(),\n            status_changed_by = NULL,\n            deletion_scheduled_at = $2\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d5375586dd60a5ba7a8bfc5d2256b00d5d3c20c7547ed7d6a8c8d76883528e0"
+}

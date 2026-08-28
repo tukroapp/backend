@@ -34,7 +34,10 @@ CREATE TYPE token_type AS ENUM(
 CREATE TYPE account_status AS ENUM(
     'active',
     'suspended',
-    'deactivated'
+    -- Saída voluntária, reversível: o próprio login devolve a conta ao ar.
+    'deactivated',
+    -- Conta já anonimizada. Não volta, e o login recusa.
+    'deleted'
 );
 
 CREATE TYPE visibility AS ENUM(
@@ -101,6 +104,13 @@ CREATE TYPE report_status AS ENUM(
     'dismissed'
 );
 
+CREATE TYPE moderation_action AS ENUM(
+    'content_removed',
+    'content_restored',
+    'user_suspended',
+    'user_unsuspended'
+);
+
 CREATE TYPE activity_kind AS ENUM(
     'testimonial_received',
     'community_joined',
@@ -125,9 +135,15 @@ CREATE TABLE auth_user(
     password_hash TEXT,
     google_id TEXT,
     last_login TIMESTAMPTZ DEFAULT NULL,
+    -- Exclusão definitiva pedida pelo usuário, com prazo para ele se arrepender.
+    -- A conta fica desativada até lá; o worker anonimiza quando vence.
+    deletion_scheduled_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT check_auth_user_credential CHECK (password_hash IS NOT NULL OR google_id IS NOT NULL),
+    -- A conta anonimizada perde as duas credenciais, então fica fora da regra.
+    CONSTRAINT check_auth_user_credential CHECK (status = 'deleted'
+        OR password_hash IS NOT NULL
+        OR google_id IS NOT NULL),
     CONSTRAINT check_auth_user_suspension CHECK (status = 'suspended' OR suspended_until IS NULL)
 );
 
@@ -137,6 +153,11 @@ SELECT
 CREATE UNIQUE INDEX idx_auth_user_google_id ON auth_user(google_id)
 WHERE
     google_id IS NOT NULL;
+
+-- A fila do worker de exclusão.
+CREATE INDEX idx_auth_user_deletion_due ON auth_user(deletion_scheduled_at)
+WHERE
+    deletion_scheduled_at IS NOT NULL;
 
 CREATE TABLE user_profile(
     user_id UUID PRIMARY KEY REFERENCES auth_user(id) ON DELETE CASCADE,
@@ -421,6 +442,9 @@ CREATE TABLE community(
     description TEXT,
     avatar_url TEXT,
     is_private BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Remoção pela moderação. O dono continua excluindo de verdade pelo próprio
+    -- endpoint; aqui a comunidade só sai do ar e pode voltar.
+    deleted_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT check_community_slug_format CHECK (slug ~ '^[a-z0-9]([a-z0-9-]{1,48}[a-z0-9])$'),
@@ -733,3 +757,39 @@ CREATE INDEX idx_activity_actor ON activity(actor_id, created_at DESC, id DESC);
 
 CREATE INDEX idx_activity_recent ON activity(created_at DESC, id DESC);
 
+-- Histórico da moderação. As colunas de alvo repetem as de `report`, mas com
+-- ON DELETE SET NULL: o registro precisa sobreviver ao conteúdo que descreve.
+-- É por isso que existe o `content_snapshot`, que guarda o texto removido.
+-- Ao contrário de `report`, aqui não há alvo único: a remoção de um conteúdo
+-- preenche a coluna do conteúdo e também `target_user_id`, que é o autor, para
+-- o histórico por conta sair numa consulta só.
+CREATE TABLE moderation_log(
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    moderator_id UUID REFERENCES auth_user(id) ON DELETE SET NULL,
+    action moderation_action NOT NULL,
+    -- A denúncia que originou a ação, quando houve uma.
+    report_id UUID REFERENCES report(id) ON DELETE SET NULL,
+    reason TEXT,
+    content_snapshot TEXT,
+    target_user_id UUID REFERENCES auth_user(id) ON DELETE SET NULL,
+    scrap_id UUID REFERENCES scrap(id) ON DELETE SET NULL,
+    testimonial_id UUID REFERENCES testimonial(id) ON DELETE SET NULL,
+    community_id UUID REFERENCES community(id) ON DELETE SET NULL,
+    topic_id UUID REFERENCES community_topic(id) ON DELETE SET NULL,
+    comment_id UUID REFERENCES community_topic_comment(id) ON DELETE SET NULL,
+    poll_id UUID REFERENCES community_poll(id) ON DELETE SET NULL,
+    -- Cópia do slug e do nome de quem sofreu a ação, para o histórico continuar
+    -- legível depois que a conta ou a comunidade some.
+    target_label TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_moderation_log_recent ON moderation_log(created_at DESC, id DESC);
+
+CREATE INDEX idx_moderation_log_target_user ON moderation_log(target_user_id, created_at DESC)
+WHERE
+    target_user_id IS NOT NULL;
+
+CREATE INDEX idx_moderation_log_report ON moderation_log(report_id)
+WHERE
+    report_id IS NOT NULL;

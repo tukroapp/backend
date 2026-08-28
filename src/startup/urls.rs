@@ -8,7 +8,7 @@ use actix_web::{
 use crate::{
     middlewares::auth::{needs_authentication, needs_superuser, optional_authentication},
     routes::{
-        admin, auth, block, community, conversation, feed, friend, healthcheck, me, media,
+        account, admin, auth, block, community, conversation, feed, friend, healthcheck, me, media,
         notification, poll, profile, report, scrap, testimonial, topic,
     },
     utils::{CustomIpExtractor, UserSessionExtractor},
@@ -116,8 +116,10 @@ fn me_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         .service(
             resource("")
                 .route(get().to(me::get))
-                .route(put().to(me::put)),
+                .route(put().to(me::put))
+                .route(delete().to(account::deactivate)),
         )
+        .service(resource("/deletion").route(post().to(account::schedule_deletion)))
         .service(
             resource("/avatar")
                 .route(post().to(me::post_avatar))
@@ -309,14 +311,20 @@ fn admin_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
                 .service(resource("/{id}").route(get().to(admin::report::detail)))
                 .service(resource("/{id}/reviewing").route(post().to(admin::report::reviewing)))
                 .service(resource("/{id}/resolve").route(post().to(admin::report::resolve)))
-                .service(resource("/{id}/dismiss").route(post().to(admin::report::dismiss))),
+                .service(resource("/{id}/dismiss").route(post().to(admin::report::dismiss)))
+                .service(resource("/{id}/remove").route(post().to(admin::moderation::remove))),
         )
         .service(
-            scope("/user").service(
-                resource("/{slug}/suspend")
-                    .route(post().to(admin::user::suspend))
-                    .route(delete().to(admin::user::unsuspend)),
-            ),
+            resource("/content/{kind}/{id}/restore").route(post().to(admin::moderation::restore)),
+        )
+        .service(
+            scope("/user")
+                .service(
+                    resource("/{slug}/suspend")
+                        .route(post().to(admin::user::suspend))
+                        .route(delete().to(admin::user::unsuspend)),
+                )
+                .service(resource("/{slug}/history").route(get().to(admin::moderation::history))),
         )
 }
 
@@ -325,7 +333,13 @@ fn report_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
     scope("/report")
         .wrap(Governor::new(limits.strict))
         .wrap(from_fn(needs_authentication))
-        .service(resource("/{slug}").route(post().to(report::post)))
+        .service(resource("/profile/{slug}").route(post().to(report::profile)))
+        .service(resource("/scrap/{id}").route(post().to(report::scrap)))
+        .service(resource("/testimonial/{id}").route(post().to(report::testimonial)))
+        .service(resource("/community/{slug}").route(post().to(report::community)))
+        .service(resource("/topic/{id}").route(post().to(report::topic)))
+        .service(resource("/comment/{id}").route(post().to(report::comment)))
+        .service(resource("/poll/{id}").route(post().to(report::poll)))
 }
 
 /// `/read-all` precisa vir antes de `/{id}`, senão o resource do id casa com a

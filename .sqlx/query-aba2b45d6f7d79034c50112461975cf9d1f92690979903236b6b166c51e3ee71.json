@@ -1,0 +1,147 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            t.id,\n            t.body,\n            t.status::TEXT AS \"status!\",\n            t.created_at,\n            t.updated_at,\n            t.responded_at,\n            up.user_id AS profile_id,\n            up.slug AS profile_slug,\n            up.name AS profile_name,\n            up.avatar_url AS profile_avatar_url,\n            up.status AS profile_status\n        FROM testimonial t\n        INNER JOIN user_profile up\n            ON up.user_id = CASE WHEN $2 THEN t.profile_id ELSE t.author_id END\n        INNER JOIN auth_user au ON au.id = up.user_id AND au.status IN ('active', 'deleted')\n        WHERE (CASE WHEN $2 THEN t.author_id ELSE t.profile_id END) = $1\n          AND t.deleted_at IS NULL\n          AND ($3::TEXT IS NULL OR t.status::TEXT = $3)\n          AND ($4::uuid IS NULL OR t.id < $4::uuid)\n        ORDER BY t.id DESC\n        LIMIT $5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "responded_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "testimonial",
+            "name": "responded_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "profile_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "profile_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "profile_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "profile_avatar_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "profile_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Text",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "aba2b45d6f7d79034c50112461975cf9d1f92690979903236b6b166c51e3ee71"
+}

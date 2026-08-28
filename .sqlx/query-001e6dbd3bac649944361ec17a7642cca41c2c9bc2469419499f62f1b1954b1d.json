@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE report\n        SET status = 'resolved', reviewed_by = $2, reviewed_at = NOW()\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "001e6dbd3bac649944361ec17a7642cca41c2c9bc2469419499f62f1b1954b1d"
+}

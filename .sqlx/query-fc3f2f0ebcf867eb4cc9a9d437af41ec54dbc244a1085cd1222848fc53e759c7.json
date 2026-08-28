@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cc.body,\n                cc.created_at,\n                cc.deleted_at IS NOT NULL AS \"is_deleted!\",\n                ct.id AS topic_id,\n                ct.title AS topic_title,\n                c.slug AS community_slug\n            FROM community_topic_comment cc\n            INNER JOIN community_topic ct ON ct.id = cc.topic_id\n            INNER JOIN community c ON c.id = ct.community_id\n            WHERE cc.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_topic_comment",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "community_topic_comment",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_deleted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "topic_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "topic_title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_topic",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "community_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fc3f2f0ebcf867eb4cc9a9d437af41ec54dbc244a1085cd1222848fc53e759c7"
+}

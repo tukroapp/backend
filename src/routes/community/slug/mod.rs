@@ -136,7 +136,7 @@ pub async fn fetch_community_target(
             ) AS "has_pending_request!"
         FROM community c
         LEFT JOIN community_member cm ON cm.community_id = c.id AND cm.user_id = $2::uuid
-        WHERE c.slug = $1
+        WHERE c.slug = $1 AND c.deleted_at IS NULL
         "#,
         slug,
         viewer,

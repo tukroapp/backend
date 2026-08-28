@@ -2,8 +2,8 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::routes::{
-    admin, auth, block, community, conversation, feed, friend, healthcheck, me, media, notification,
-    poll, profile, report, scrap, testimonial, topic,
+    account, admin, auth, block, community, conversation, feed, friend, healthcheck, me, media,
+    notification, poll, profile, report, scrap, testimonial, topic,
 };
 
 #[derive(OpenApi)]
@@ -138,8 +138,18 @@ use crate::routes::{
         notification::read_all,
         notification::delete,
 
+        // Account
+        account::deactivate,
+        account::schedule_deletion,
+
         // Reports
-        report::post,
+        report::profile,
+        report::scrap,
+        report::testimonial,
+        report::community,
+        report::topic,
+        report::comment,
+        report::poll,
 
         // Admin
         admin::report::get,
@@ -149,6 +159,9 @@ use crate::routes::{
         admin::report::dismiss,
         admin::user::suspend,
         admin::user::unsuspend,
+        admin::moderation::remove,
+        admin::moderation::restore,
+        admin::moderation::history,
 
         // Blocks
         block::get,

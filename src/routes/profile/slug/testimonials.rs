@@ -127,7 +127,7 @@ pub async fn get(
         FROM testimonial t
         INNER JOIN user_profile up ON up.user_id = t.author_id
         -- Depoimento de quem está suspenso ou desativado some do perfil alheio.
-        INNER JOIN auth_user au ON au.id = t.author_id AND au.status = 'active'
+        INNER JOIN auth_user au ON au.id = t.author_id AND au.status IN ('active', 'deleted')
         WHERE t.profile_id = $1
           AND t.status = 'accepted'
           AND t.deleted_at IS NULL

@@ -22,7 +22,7 @@ async fn promote(app: &TestApp, user: &RegisteredUser) {
 async fn report(app: &TestApp, reporter: &RegisteredUser, slug: &str, reason: &str) -> String {
     let response = app
         .api_client
-        .post(format!("{}/api/v1/report/{}", &app.address, slug))
+        .post(format!("{}/api/v1/report/profile/{}", &app.address, slug))
         .header(reqwest::header::AUTHORIZATION, reporter.auth_header())
         .json(&json!({ "reason": reason, "details": "detalhes da denúncia" }))
         .send()
@@ -133,7 +133,12 @@ async fn the_queue_lists_reports_and_filters_by_status() {
     // Assert
     assert_eq!(all["results"].as_array().unwrap().len(), 2);
     assert_eq!(all["results"][0]["reporter"]["slug"], carol.slug);
-    assert_eq!(all["results"][0]["reported"]["slug"], alice.slug);
+    assert_eq!(
+        all["results"][0]["accountable"]["profile"]["slug"],
+        alice.slug
+    );
+    assert_eq!(all["results"][0]["target"]["kind"], "profile");
+    assert_eq!(all["results"][0]["target"]["slug"], alice.slug);
 
     assert_eq!(open["results"].as_array().unwrap().len(), 1);
     assert_eq!(open["results"][0]["reporter"]["slug"], carol.slug);
@@ -473,4 +478,141 @@ async fn the_panel_sees_what_the_user_deleted() {
         .find(|item| item["body"] == "conteúdo inocente")
         .expect("o recado normal sumiu do painel");
     assert_eq!(kept["is_deleted"], false);
+}
+
+async fn json_of(response: reqwest::Response) -> serde_json::Value {
+    response.json().await.expect("response not JSON")
+}
+
+/// Escreve um recado e devolve o id, para as denúncias de conteúdo.
+async fn post_scrap_returning_id(
+    app: &TestApp,
+    author: &RegisteredUser,
+    slug: &str,
+    body: &str,
+) -> String {
+    let response = app
+        .api_client
+        .post(format!("{}/api/v1/profile/{}/scrap", &app.address, slug))
+        .header(reqwest::header::AUTHORIZATION, author.auth_header())
+        .json(&json!({ "body": body }))
+        .send()
+        .await
+        .expect("Failed to post scrap");
+
+    json_of(response).await["results"]["id"]
+        .as_str()
+        .expect("scrap id not found")
+        .to_string()
+}
+
+async fn report_target(app: &TestApp, reporter: &RegisteredUser, kind: &str, id: &str) -> String {
+    let response = app
+        .api_client
+        .post(format!("{}/api/v1/report/{}/{}", &app.address, kind, id))
+        .header(reqwest::header::AUTHORIZATION, reporter.auth_header())
+        .json(&json!({ "reason": "harassment", "details": "conteúdo abusivo" }))
+        .send()
+        .await
+        .expect("Failed to report target");
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    json_of(response).await["results"]["id"]
+        .as_str()
+        .expect("report id not found")
+        .to_string()
+}
+
+#[tokio::test]
+async fn a_content_report_brings_the_target_and_its_author() {
+    // Arrange
+    let app = spawn_app().await;
+    let admin = register_and_login(&app, "Admin").await;
+    promote(&app, &admin).await;
+
+    let alice = register_and_login(&app, "Alice").await;
+    let bob = register_and_login(&app, "Bob").await;
+
+    open_wall(&app, &alice).await;
+    let scrap_id = post_scrap_returning_id(&app, &bob, &alice.slug, "compre seguidores").await;
+    let id = report_target(&app, &alice, "scrap", &scrap_id).await;
+
+    // Act
+    let scraps = queue(&app, &admin, "kind=scrap").await;
+    let empty = queue(&app, &admin, "kind=profile").await;
+    let body = json_of(detail(&app, &admin, &id).await).await;
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    let item = &scraps["results"][0];
+    assert_eq!(item["target"]["kind"], "scrap");
+    assert_eq!(item["target"]["id"], scrap_id);
+    // O mural é o link do conteúdo
+    assert_eq!(item["target"]["slug"], alice.slug);
+    assert_eq!(item["target"]["excerpt"], "compre seguidores");
+    assert_eq!(item["target"]["is_deleted"], false);
+    // O responsável é o autor do recado, não o dono do mural
+    assert_eq!(item["accountable"]["profile"]["slug"], bob.slug);
+    assert_eq!(item["accountable"]["account_status"], "active");
+
+    assert!(empty["results"].as_array().unwrap().is_empty());
+
+    let results = &body["results"];
+    assert_eq!(results["target"]["kind"], "scrap");
+    assert_eq!(results["target"]["body"], "compre seguidores");
+    assert_eq!(results["target"]["wall_slug"], alice.slug);
+    assert_eq!(results["reported"]["slug"], bob.slug);
+    assert_eq!(results["reported"]["email"], bob.email);
+}
+
+#[tokio::test]
+async fn a_community_report_has_no_accountable_user() {
+    // Arrange
+    let app = spawn_app().await;
+    let admin = register_and_login(&app, "Admin").await;
+    promote(&app, &admin).await;
+
+    let owner = register_and_login(&app, "Dono").await;
+    let reporter = register_and_login(&app, "Denunciante").await;
+
+    let response = app
+        .api_client
+        .post(format!("{}/api/v1/community", &app.address))
+        .header(reqwest::header::AUTHORIZATION, owner.auth_header())
+        .json(&json!({ "name": "Comunidade Suspeita", "is_private": false }))
+        .send()
+        .await
+        .expect("Failed to create community");
+    let slug = json_of(response).await["results"]["slug"]
+        .as_str()
+        .expect("slug not found")
+        .to_string();
+
+    let id = report_target(&app, &reporter, "community", &slug).await;
+
+    // Act
+    let communities = queue(&app, &admin, "").await;
+    let body = json_of(detail(&app, &admin, &id).await).await;
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(communities["results"][0]["target"]["kind"], "community");
+    assert_eq!(
+        communities["results"][0]["target"]["title"],
+        "Comunidade Suspeita"
+    );
+    assert!(communities["results"][0]["accountable"].is_null());
+
+    let results = &body["results"];
+    assert_eq!(results["target"]["kind"], "community");
+    assert_eq!(results["target"]["slug"], slug);
+    assert_eq!(results["target"]["members_count"], 1);
+    assert_eq!(results["target"]["owner_slug"], owner.slug);
+    assert!(results["reported"].is_null());
+    assert!(results["recent_scraps"].as_array().unwrap().is_empty());
 }

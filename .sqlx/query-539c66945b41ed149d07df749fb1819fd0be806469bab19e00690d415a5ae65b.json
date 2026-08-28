@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT storage_key FROM user_media WHERE user_id = $1\n        UNION ALL\n        SELECT avatar_url FROM user_profile WHERE user_id = $1 AND avatar_url IS NOT NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "storage_key",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "539c66945b41ed149d07df749fb1819fd0be806469bab19e00690d415a5ae65b"
+}

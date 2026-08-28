@@ -165,7 +165,7 @@ pub async fn fetch_topic_target(
         FROM community_topic t
         INNER JOIN community c ON c.id = t.community_id
         LEFT JOIN community_member cm ON cm.community_id = c.id AND cm.user_id = $2::uuid
-        WHERE t.id = $1 AND t.deleted_at IS NULL
+        WHERE t.id = $1 AND t.deleted_at IS NULL AND c.deleted_at IS NULL
         "#,
         topic_id,
         viewer,

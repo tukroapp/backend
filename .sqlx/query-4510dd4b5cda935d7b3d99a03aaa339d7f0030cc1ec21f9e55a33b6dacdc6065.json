@@ -1,0 +1,188 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            l.id,\n            l.action AS \"action: ModerationAction\",\n            l.reason,\n            l.content_snapshot,\n            l.target_label,\n            l.report_id,\n            CASE\n                WHEN l.scrap_id IS NOT NULL THEN 'scrap'\n                WHEN l.testimonial_id IS NOT NULL THEN 'testimonial'\n                WHEN l.community_id IS NOT NULL THEN 'community'\n                WHEN l.topic_id IS NOT NULL THEN 'topic'\n                WHEN l.comment_id IS NOT NULL THEN 'comment'\n                WHEN l.poll_id IS NOT NULL THEN 'poll'\n            END AS content_kind,\n            COALESCE(l.scrap_id, l.testimonial_id, l.community_id, l.topic_id,\n                     l.comment_id, l.poll_id) AS content_id,\n            l.created_at,\n            moderator.user_id AS \"moderator_id?\",\n            moderator.slug AS \"moderator_slug?\",\n            moderator.name AS \"moderator_name?\",\n            moderator.avatar_url AS \"moderator_avatar_url?\",\n            moderator.status AS \"moderator_status?\"\n        FROM moderation_log l\n        LEFT JOIN user_profile moderator ON moderator.user_id = l.moderator_id\n        WHERE l.target_user_id = $1\n          AND ($2::uuid IS NULL OR l.id < $2::uuid)\n        ORDER BY l.id DESC\n        LIMIT $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "action: ModerationAction",
+        "type_info": {
+          "Custom": {
+            "name": "moderation_action",
+            "kind": {
+              "Enum": [
+                "content_removed",
+                "content_restored",
+                "user_suspended",
+                "user_unsuspended"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "action"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "content_snapshot",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "content_snapshot"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "target_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "target_label"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "report_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "report_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "content_kind",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "content_id",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "moderator_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "moderator_slug?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "moderator_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "moderator_avatar_url?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "moderator_status?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      null,
+      null,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4510dd4b5cda935d7b3d99a03aaa339d7f0030cc1ec21f9e55a33b6dacdc6065"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM fan WHERE fan_id = $1 OR idol_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a6b66d1e635497183bbde8e51beee6b04e0ed876820c941fc3313c95f6cb7f6d"
+}

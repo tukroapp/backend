@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_profile\n        SET slug = $2,\n            name = 'Usuário excluído',\n            avatar_url = NULL,\n            status = NULL,\n            bio = NULL,\n            city = NULL,\n            birthdate = NULL,\n            relationship_status = NULL,\n            country = NULL,\n            state = NULL,\n            languages = '{}',\n            interests = '{}',\n            who_i_want_to_meet = NULL,\n            occupation = NULL,\n            company = NULL,\n            education = NULL,\n            music = '{}',\n            movies = '{}',\n            books = '{}',\n            tv_shows = '{}',\n            foods = '{}',\n            sports = '{}',\n            pets = NULL,\n            fashion_style = NULL\n        WHERE user_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "326919a53c69464051e3bca45709332023a97ffe23392b4ac25bd2ea8c1c4341"
+}

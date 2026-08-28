@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT action AS \"action: ModerationAction\"\n        FROM moderation_log\n        WHERE action IN ('content_removed', 'content_restored')\n          AND (scrap_id = $1 OR testimonial_id = $2 OR community_id = $3\n               OR topic_id = $4 OR comment_id = $5 OR poll_id = $6)\n        ORDER BY id DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "action: ModerationAction",
+        "type_info": {
+          "Custom": {
+            "name": "moderation_action",
+            "kind": {
+              "Enum": [
+                "content_removed",
+                "content_restored",
+                "user_suspended",
+                "user_unsuspended"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "moderation_log",
+            "name": "action"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ba1f1e75a77a57bb37f4aec3ed873b4f270cb8c39953b65109c5e1318de92834"
+}

@@ -101,7 +101,9 @@ pub async fn fetch_scraps(
         FROM scrap s
         INNER JOIN user_profile up ON up.user_id = s.author_id
         -- Recado de quem está suspenso ou desativado some do mural alheio.
-        INNER JOIN auth_user au ON au.id = s.author_id AND au.status = 'active'
+        -- Recado de conta desativada some do mural; o de conta excluída fica,
+        -- assinado pelo perfil anonimizado, para a conversa não perder o fio.
+        INNER JOIN auth_user au ON au.id = s.author_id AND au.status IN ('active', 'deleted')
         WHERE s.profile_id = $1
           AND s.deleted_at IS NULL
           AND s.parent_id IS NOT DISTINCT FROM $2::uuid

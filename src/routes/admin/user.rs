@@ -10,6 +10,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
+    routes::admin::moderation::{LogEntry, ModerationAction, log_action},
     services::auth::{AccountStatus, SessionData, delete_all_sessions},
     startup::RedisPool,
     utils::{ApiErrorResponse, db_err, invalid_field},
@@ -119,6 +120,8 @@ pub async fn suspend(
         );
     }
 
+    let mut tx = pool.begin().await.map_err(db_err)?;
+
     sqlx::query!(
         r#"
         UPDATE auth_user
@@ -134,9 +137,26 @@ pub async fn suspend(
         payload.until,
         session.user_id,
     )
-    .execute(pool.get_ref())
+    .execute(&mut *tx)
     .await
     .map_err(db_err)?;
+
+    log_action(
+        &mut tx,
+        LogEntry {
+            moderator_id: session.user_id,
+            action: ModerationAction::UserSuspended,
+            report_id: None,
+            reason: Some(payload.reason.trim()),
+            content_snapshot: None,
+            target_user_id: Some(target.id),
+            target_label: Some(&slug),
+            content: None,
+        },
+    )
+    .await?;
+
+    tx.commit().await.map_err(db_err)?;
 
     // A sessão vive no Redis e não consulta o banco a cada requisição, então a
     // suspensão só vale de imediato se derrubar o que já está aberto.
@@ -171,6 +191,8 @@ pub async fn unsuspend(
         return Ok(user_not_found());
     }
 
+    let mut tx = pool.begin().await.map_err(db_err)?;
+
     sqlx::query!(
         r#"
         UPDATE auth_user
@@ -184,9 +206,26 @@ pub async fn unsuspend(
         target.id,
         session.user_id,
     )
-    .execute(pool.get_ref())
+    .execute(&mut *tx)
     .await
     .map_err(db_err)?;
+
+    log_action(
+        &mut tx,
+        LogEntry {
+            moderator_id: session.user_id,
+            action: ModerationAction::UserUnsuspended,
+            report_id: None,
+            reason: None,
+            content_snapshot: None,
+            target_user_id: Some(target.id),
+            target_label: Some(&slug),
+            content: None,
+        },
+    )
+    .await?;
+
+    tx.commit().await.map_err(db_err)?;
 
     Ok(HttpResponse::NoContent().finish())
 }

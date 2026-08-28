@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS moderation_log;
+
 DROP TABLE IF EXISTS activity;
 
 DROP TABLE IF EXISTS message CASCADE;
@@ -59,6 +61,8 @@ DROP FUNCTION IF EXISTS bump_topic_activity;
 DROP FUNCTION IF EXISTS set_updated_at_for;
 
 DROP FUNCTION IF EXISTS set_updated_at;
+
+DROP TYPE IF EXISTS moderation_action;
 
 DROP TYPE IF EXISTS activity_kind;
 

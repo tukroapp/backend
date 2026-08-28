@@ -111,7 +111,7 @@ pub async fn get(
         FROM testimonial t
         INNER JOIN user_profile up
             ON up.user_id = CASE WHEN $2 THEN t.profile_id ELSE t.author_id END
-        INNER JOIN auth_user au ON au.id = up.user_id AND au.status = 'active'
+        INNER JOIN auth_user au ON au.id = up.user_id AND au.status IN ('active', 'deleted')
         WHERE (CASE WHEN $2 THEN t.author_id ELSE t.profile_id END) = $1
           AND t.deleted_at IS NULL
           AND ($3::TEXT IS NULL OR t.status::TEXT = $3)

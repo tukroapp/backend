@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT cm.user_id\n            FROM community_member cm\n            INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'\n            WHERE cm.community_id = $1 AND cm.user_id <> $2\n            ORDER BY cm.role DESC, cm.joined_at\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "community_member",
+            "name": "user_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5c161aebdd250d494633863c1363ac97df03721f0042a879226c93a4586ebb9a"
+}

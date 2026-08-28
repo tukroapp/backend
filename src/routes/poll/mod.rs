@@ -295,7 +295,7 @@ pub async fn fetch_poll_target(
         FROM community_poll p
         INNER JOIN community c ON c.id = p.community_id
         LEFT JOIN community_member cm ON cm.community_id = c.id AND cm.user_id = $2::uuid
-        WHERE p.id = $1 AND p.deleted_at IS NULL
+        WHERE p.id = $1 AND p.deleted_at IS NULL AND c.deleted_at IS NULL
         "#,
         poll_id,
         viewer,

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id\n            FROM auth_user\n            WHERE deletion_scheduled_at IS NOT NULL\n              AND deletion_scheduled_at <= $1\n            ORDER BY deletion_scheduled_at\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "auth_user",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3df39e8d840bb6319799aff03f43723dc9cb61e077f8c06730141bb881a99f64"
+}

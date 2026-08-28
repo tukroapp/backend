@@ -79,6 +79,7 @@ pub async fn get(
         FROM community_member cm
         INNER JOIN community c ON c.id = cm.community_id
         WHERE cm.user_id = $1
+          AND c.deleted_at IS NULL
           AND ($2::uuid IS NULL OR c.id < $2::uuid)
         ORDER BY c.id DESC
         LIMIT $3

@@ -35,7 +35,8 @@
               "Enum": [
                 "active",
                 "suspended",
-                "deactivated"
+                "deactivated",
+                "deleted"
               ]
             }
           }

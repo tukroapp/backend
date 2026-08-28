@@ -154,6 +154,7 @@ async fn search_communities(
             similarity(c.name, $1) AS "score!"
         FROM community c
         WHERE (c.name % $1 OR c.slug LIKE $1 || '%')
+          AND c.deleted_at IS NULL
           AND (
               $2::real IS NULL
               OR (similarity(c.name, $1), c.id) < ($2::real, $3::uuid)
@@ -211,7 +212,8 @@ async fn recent_communities(
                 WHERE cm.community_id = c.id
             ) AS "members_count!"
         FROM community c
-        WHERE ($1::uuid IS NULL OR c.id < $1::uuid)
+        WHERE c.deleted_at IS NULL
+          AND ($1::uuid IS NULL OR c.id < $1::uuid)
         ORDER BY c.id DESC
         LIMIT $2
         "#,

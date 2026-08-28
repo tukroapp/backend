@@ -1,0 +1,90 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                cp.question,\n                cp.created_at,\n                cp.is_closed,\n                cp.closes_at,\n                cp.deleted_at IS NOT NULL AS \"is_deleted!\",\n                c.slug AS community_slug,\n                ARRAY(\n                    SELECT o.text\n                    FROM community_poll_option o\n                    WHERE o.poll_id = cp.id\n                    ORDER BY o.position\n                ) AS \"options!\"\n            FROM community_poll cp\n            INNER JOIN community c ON c.id = cp.community_id\n            WHERE cp.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "question",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "question"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "is_closed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "is_closed"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "closes_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "community_poll",
+            "name": "closes_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "is_deleted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "community_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "options!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "55748fa2895f9046c2313da797fadf5733dd4b43bf257beebc1a5b6bdb870a57"
+}
