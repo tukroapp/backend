@@ -415,5 +415,6 @@ fn friend_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
                         .route(delete().to(friend::request::cancel)),
                 ),
         )
+        .service(resource("/top").route(put().to(friend::top::put)))
         .service(resource("/{slug}").route(delete().to(friend::delete)))
 }

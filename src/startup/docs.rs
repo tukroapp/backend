@@ -67,6 +67,7 @@ use crate::routes::{
         friend::request::reject,
         friend::request::cancel,
         friend::delete,
+        friend::top::put,
 
         // Scraps
         profile::slug::scraps::get,

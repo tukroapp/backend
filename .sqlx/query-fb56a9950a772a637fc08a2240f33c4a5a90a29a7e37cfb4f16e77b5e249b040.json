@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE friend SET top_position = NULL WHERE user_id = $1 AND top_position IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fb56a9950a772a637fc08a2240f33c4a5a90a29a7e37cfb4f16e77b5e249b040"
+}

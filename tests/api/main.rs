@@ -24,6 +24,7 @@ mod report;
 mod seed_admin;
 mod scrap;
 mod testimonial;
+mod top_friends;
 mod topic;
 mod topic_comment;
 mod visitor;

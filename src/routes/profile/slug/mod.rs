@@ -39,6 +39,40 @@ use crate::{
 /// Quantidade de amigos exibida no próprio perfil, antes de abrir a lista completa.
 const FRIENDS_PREVIEW_LIMIT: i64 = 9;
 
+/// Os amigos destacados pelo dono, na ordem que ele escolheu.
+async fn fetch_top_friends(
+    pool: &PgPool,
+    storage: &dyn StorageService,
+    user_id: Uuid,
+) -> Result<Vec<ProfileSummary>, actix_web::Error> {
+    let mut friends = sqlx::query_as!(
+        ProfileSummary,
+        r#"
+        SELECT
+            up.user_id AS id,
+            up.slug,
+            up.name,
+            up.avatar_url,
+            up.status
+        FROM friend f
+        INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'
+        INNER JOIN user_profile up ON up.user_id = f.friend_id
+        WHERE f.user_id = $1 AND f.top_position IS NOT NULL
+        ORDER BY f.top_position
+        "#,
+        user_id,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(db_err)?;
+
+    for friend in &mut friends {
+        friend.avatar_url = public_url_of(storage, friend.avatar_url.take());
+    }
+
+    Ok(friends)
+}
+
 /// Perfil detalhado, no estilo das abas social, profissional e pessoal do Orkut.
 /// Só chega para quem a privacidade do dono deixa ver.
 #[derive(Serialize, ToSchema)]
@@ -86,6 +120,14 @@ pub struct ProfileResponse {
     /// Total de amigos do perfil, `null` quando `friends_visible` é `false`.
     pub friends_count: Option<i64>,
     pub friends: Vec<ProfileSummary>,
+    /// Os amigos que o dono destacou, na ordem que ele escolheu. Vem vazio
+    /// quando ninguém foi destacado, e aí a vitrine é o `friends`.
+    pub top_friends: Vec<ProfileSummary>,
+    /// Amigos que os dois têm em comum. `null` para anônimo, no próprio perfil e
+    /// quando a lista de amigos está privada.
+    pub mutual_friends_count: Option<i64>,
+    /// Uma amostra desses amigos em comum, no mesmo limite da prévia de amigos.
+    pub mutual_friends: Vec<ProfileSummary>,
     /// `false` quando a privacidade do dono esconde o mural de recados de quem
     /// está olhando.
     pub scraps_visible: bool,
@@ -318,11 +360,21 @@ pub async fn get(
                 SELECT COUNT(*) FROM fan
                 INNER JOIN auth_user au ON au.id = fan.fan_id AND au.status = 'active'
                 WHERE fan.idol_id = user_profile.user_id
-            ) AS "fans_count!"
+            ) AS "fans_count!",
+            (
+                SELECT COUNT(*) FROM friend f
+                INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'
+                WHERE f.user_id = user_profile.user_id
+                  AND EXISTS (
+                      SELECT 1 FROM friend mine
+                      WHERE mine.user_id = $2::uuid AND mine.friend_id = f.friend_id
+                  )
+            ) AS "mutual_friends_count!"
         FROM user_profile
         WHERE user_id = $1
         "#,
         target.user_id,
+        viewer,
     )
     .fetch_one(pool.get_ref())
     .await
@@ -337,18 +389,45 @@ pub async fn get(
         _ => None,
     };
 
-    let friends = if target.can_view_profile_details {
-        friends::fetch_friends(
+    // Amigos em comum só fazem sentido para quem está logado olhando outro
+    // perfil, e seguem a mesma privacidade da lista de amigos.
+    let mutual_with = viewer.filter(|viewer| *viewer != target.user_id);
+    let shows_friends = target.can_view_profile_details;
+
+    let (friends, top_friends, mutual_friends) = if shows_friends {
+        let friends = friends::fetch_friends(
             pool.get_ref(),
             storage.as_ref().as_ref(),
             target.user_id,
             None,
             None,
             FRIENDS_PREVIEW_LIMIT,
+            None,
         )
-        .await?
+        .await?;
+
+        let top_friends =
+            fetch_top_friends(pool.get_ref(), storage.as_ref().as_ref(), target.user_id).await?;
+
+        let mutual_friends = match mutual_with {
+            None => Vec::new(),
+            Some(mutual_with) => {
+                friends::fetch_friends(
+                    pool.get_ref(),
+                    storage.as_ref().as_ref(),
+                    target.user_id,
+                    None,
+                    None,
+                    FRIENDS_PREVIEW_LIMIT,
+                    Some(mutual_with),
+                )
+                .await?
+            }
+        };
+
+        (friends, top_friends, mutual_friends)
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new(), Vec::new())
     };
 
     Ok(HttpResponse::Ok().json(ApiResponse::new(ProfileResponse {
@@ -385,6 +464,10 @@ pub async fn get(
             .can_view_profile_details
             .then_some(profile.friends_count),
         friends,
+        top_friends,
+        mutual_friends_count: (shows_friends && mutual_with.is_some())
+            .then_some(profile.mutual_friends_count),
+        mutual_friends,
         scraps_visible: target.can_read_scrap,
         can_write_scrap: target.can_write_scrap,
         scraps_count: target.can_read_scrap.then_some(profile.scraps_count),

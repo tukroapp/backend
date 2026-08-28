@@ -316,10 +316,20 @@ WHERE
 CREATE TABLE friend(
     user_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
     friend_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
+    -- Posição no "top amigos" do dono da linha, de 1 a 9 como a grade do Orkut.
+    -- NULL é o normal: só quem a pessoa destacou tem posição.
+    top_position SMALLINT DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, friend_id),
-    CONSTRAINT check_friend_not_self CHECK (user_id <> friend_id)
+    CONSTRAINT check_friend_not_self CHECK (user_id <> friend_id),
+    CONSTRAINT check_friend_top_position CHECK (top_position IS NULL
+        OR top_position BETWEEN 1 AND 9)
 );
+
+-- Uma posição por pessoa: a lista é uma ordem, não um conjunto de empates.
+CREATE UNIQUE INDEX idx_friend_top_position ON friend(user_id, top_position)
+WHERE
+    top_position IS NOT NULL;
 
 -- "Sou fã": relação unilateral, sem aprovação, sem exigir amizade. A linha
 -- presente é o estado; ativar/desativar é insert/delete.

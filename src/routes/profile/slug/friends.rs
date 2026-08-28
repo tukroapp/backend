@@ -28,10 +28,14 @@ use crate::{
 pub struct FriendsQuery {
     /// Filtro opcional pelo nome (trecho) ou pelo início do slug do amigo.
     pub q: Option<String>,
+    /// `true` deixa só os amigos em comum com quem está olhando. Ignorado para
+    /// visitante anônimo e no próprio perfil, onde todo amigo é comum.
+    pub mutual: Option<bool>,
 }
 
 /// Amigos ordenados pelo id (UUIDv7) do amigo, em ordem decrescente, que é o
-/// mesmo critério usado pelo cursor. `term` filtra por nome ou slug quando vier.
+/// mesmo critério usado pelo cursor. `term` filtra por nome ou slug quando vier,
+/// e `mutual_with` restringe a quem também é amigo de quem está olhando.
 pub async fn fetch_friends(
     pool: &PgPool,
     storage: &dyn StorageService,
@@ -39,6 +43,7 @@ pub async fn fetch_friends(
     term: Option<&str>,
     cursor: Option<Uuid>,
     limit: i64,
+    mutual_with: Option<Uuid>,
 ) -> Result<Vec<ProfileSummary>, actix_web::Error> {
     let mut friends = sqlx::query_as!(
         ProfileSummary,
@@ -59,6 +64,13 @@ pub async fn fetch_friends(
               OR up.name ILIKE '%' || $3 || '%'
               OR up.slug LIKE $3 || '%'
           )
+          AND (
+              $5::uuid IS NULL
+              OR EXISTS (
+                  SELECT 1 FROM friend mine
+                  WHERE mine.user_id = $5::uuid AND mine.friend_id = f.friend_id
+              )
+          )
         ORDER BY f.friend_id DESC
         LIMIT $4
         "#,
@@ -66,6 +78,7 @@ pub async fn fetch_friends(
         cursor,
         term,
         limit,
+        mutual_with,
     )
     .fetch_all(pool)
     .await
@@ -85,6 +98,7 @@ pub async fn fetch_friends(
     params(
         ("slug" = String, Path, description = "Slug público do perfil"),
         ("q" = Option<String>, Query, description = "Filtra os amigos por trecho do nome ou início do slug"),
+        ("mutual" = Option<bool>, Query, description = "Só os amigos em comum com quem está olhando"),
         CursorPaginationQuery,
     ),
     responses(
@@ -132,6 +146,14 @@ pub async fn get(
                 .replace('_', "\\_")
         });
 
+    // No próprio perfil o filtro não teria sentido: todo amigo seria comum.
+    let mutual_with = query
+        .mutual
+        .unwrap_or(false)
+        .then_some(viewer)
+        .flatten()
+        .filter(|viewer| *viewer != target.user_id);
+
     let mut friends = fetch_friends(
         pool.get_ref(),
         storage.as_ref().as_ref(),
@@ -139,6 +161,7 @@ pub async fn get(
         term.as_deref(),
         pagination.cursor_id(),
         limit + 1,
+        mutual_with,
     )
     .await?;
 
