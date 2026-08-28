@@ -42,6 +42,8 @@ pub enum ContentKind {
     Topic,
     Comment,
     Poll,
+    Media,
+    MediaComment,
 }
 
 impl ContentKind {
@@ -53,6 +55,8 @@ impl ContentKind {
             "topic" => Some(ContentKind::Topic),
             "comment" => Some(ContentKind::Comment),
             "poll" => Some(ContentKind::Poll),
+            "media" => Some(ContentKind::Media),
+            "media_comment" => Some(ContentKind::MediaComment),
             _ => None,
         }
     }
@@ -110,8 +114,16 @@ pub async fn log_action(
     connection: &mut PgConnection,
     entry: LogEntry<'_>,
 ) -> Result<(), actix_web::Error> {
-    let (mut scrap, mut testimonial, mut community, mut topic, mut comment, mut poll) =
-        (None, None, None, None, None, None);
+    let (
+        mut scrap,
+        mut testimonial,
+        mut community,
+        mut topic,
+        mut comment,
+        mut poll,
+        mut media,
+        mut media_comment,
+    ) = (None, None, None, None, None, None, None, None);
 
     if let Some((kind, id)) = entry.content {
         match kind {
@@ -121,6 +133,8 @@ pub async fn log_action(
             ContentKind::Topic => topic = Some(id),
             ContentKind::Comment => comment = Some(id),
             ContentKind::Poll => poll = Some(id),
+            ContentKind::Media => media = Some(id),
+            ContentKind::MediaComment => media_comment = Some(id),
         }
     }
 
@@ -129,9 +143,10 @@ pub async fn log_action(
         INSERT INTO moderation_log (
             moderator_id, action, report_id, reason, content_snapshot,
             target_user_id, target_label,
-            scrap_id, testimonial_id, community_id, topic_id, comment_id, poll_id
+            scrap_id, testimonial_id, community_id, topic_id, comment_id, poll_id,
+            media_id, media_comment_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         "#,
         entry.moderator_id,
         entry.action as ModerationAction,
@@ -146,6 +161,8 @@ pub async fn log_action(
         topic,
         comment,
         poll,
+        media,
+        media_comment,
     )
     .execute(connection)
     .await
@@ -278,6 +295,49 @@ async fn soft_delete(
             label: row.slug,
         }),
 
+        ContentKind::Media => sqlx::query!(
+            r#"
+            UPDATE user_media m
+            SET deleted_at = NOW()
+            WHERE m.id = $1 AND m.deleted_at IS NULL
+            RETURNING
+                m.caption,
+                m.user_id,
+                (SELECT up.slug FROM user_profile up WHERE up.user_id = m.user_id) AS "slug!"
+            "#,
+            id,
+        )
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(db_err)?
+        .map(|row| RemovedContent {
+            // A foto não tem texto: o que fica no log é a legenda, quando há.
+            snapshot: row.caption.unwrap_or_default(),
+            author_id: Some(row.user_id),
+            label: row.slug,
+        }),
+
+        ContentKind::MediaComment => sqlx::query!(
+            r#"
+            UPDATE media_comment c
+            SET deleted_at = NOW()
+            WHERE c.id = $1 AND c.deleted_at IS NULL
+            RETURNING
+                c.body,
+                c.author_id,
+                (SELECT up.slug FROM user_profile up WHERE up.user_id = c.author_id) AS "slug!"
+            "#,
+            id,
+        )
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(db_err)?
+        .map(|row| RemovedContent {
+            snapshot: row.body,
+            author_id: Some(row.author_id),
+            label: row.slug,
+        }),
+
         ContentKind::Poll => sqlx::query!(
             r#"
             UPDATE community_poll p
@@ -346,6 +406,18 @@ async fn undelete(
         )
         .execute(&mut **tx)
         .await,
+        ContentKind::Media => sqlx::query!(
+            r#"UPDATE user_media SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL"#,
+            id,
+        )
+        .execute(&mut **tx)
+        .await,
+        ContentKind::MediaComment => sqlx::query!(
+            r#"UPDATE media_comment SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL"#,
+            id,
+        )
+        .execute(&mut **tx)
+        .await,
     };
 
     Ok(affected.map_err(db_err)?.rows_affected() > 0)
@@ -358,8 +430,16 @@ async fn last_action_on(
     kind: ContentKind,
     id: Uuid,
 ) -> Result<Option<ModerationAction>, actix_web::Error> {
-    let (mut scrap, mut testimonial, mut community, mut topic, mut comment, mut poll) =
-        (None, None, None, None, None, None);
+    let (
+        mut scrap,
+        mut testimonial,
+        mut community,
+        mut topic,
+        mut comment,
+        mut poll,
+        mut media,
+        mut media_comment,
+    ) = (None, None, None, None, None, None, None, None);
 
     match kind {
         ContentKind::Scrap => scrap = Some(id),
@@ -368,6 +448,8 @@ async fn last_action_on(
         ContentKind::Topic => topic = Some(id),
         ContentKind::Comment => comment = Some(id),
         ContentKind::Poll => poll = Some(id),
+        ContentKind::Media => media = Some(id),
+        ContentKind::MediaComment => media_comment = Some(id),
     }
 
     sqlx::query_scalar!(
@@ -376,7 +458,8 @@ async fn last_action_on(
         FROM moderation_log
         WHERE action IN ('content_removed', 'content_restored')
           AND (scrap_id = $1 OR testimonial_id = $2 OR community_id = $3
-               OR topic_id = $4 OR comment_id = $5 OR poll_id = $6)
+               OR topic_id = $4 OR comment_id = $5 OR poll_id = $6
+               OR media_id = $7 OR media_comment_id = $8)
         ORDER BY id DESC
         LIMIT 1
         "#,
@@ -386,6 +469,8 @@ async fn last_action_on(
         topic,
         comment,
         poll,
+        media,
+        media_comment,
     )
     .fetch_optional(&mut **tx)
     .await
@@ -421,7 +506,9 @@ pub async fn remove(
     let id = id.into_inner();
     let report = sqlx::query!(
         r#"
-        SELECT reported_user_id, scrap_id, testimonial_id, community_id, topic_id, comment_id, poll_id
+        SELECT
+            reported_user_id, scrap_id, testimonial_id, community_id, topic_id,
+            comment_id, poll_id, media_id, media_comment_id
         FROM report
         WHERE id = $1
         "#,
@@ -454,6 +541,10 @@ pub async fn remove(
         (ContentKind::Comment, target)
     } else if let Some(target) = report.poll_id {
         (ContentKind::Poll, target)
+    } else if let Some(target) = report.media_id {
+        (ContentKind::Media, target)
+    } else if let Some(target) = report.media_comment_id {
+        (ContentKind::MediaComment, target)
     } else {
         return Ok(invalid_field(
             "report",
@@ -513,7 +604,7 @@ pub async fn remove(
     path = "/api/v1/admin/content/{kind}/{id}/restore",
     description = "Devolve ao ar um conteúdo que a moderação tinha removido. O que o próprio autor apagou não é restaurado",
     params(
-        ("kind" = String, Path, description = "scrap, testimonial, community, topic, comment ou poll"),
+        ("kind" = String, Path, description = "scrap, testimonial, community, topic, comment, poll, media ou media_comment"),
         ("id" = Uuid, Path, description = "Id do conteúdo"),
     ),
     request_body = ModerationRequest,
@@ -541,7 +632,7 @@ pub async fn restore(
         return Ok(invalid_field(
             "kind",
             "invalid_kind",
-            "O tipo precisa ser 'scrap', 'testimonial', 'community', 'topic', 'comment' ou 'poll'.",
+            "O tipo precisa ser 'scrap', 'testimonial', 'community', 'topic', 'comment', 'poll', 'media' ou 'media_comment'.",
         ));
     };
 

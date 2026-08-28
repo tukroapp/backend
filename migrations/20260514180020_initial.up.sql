@@ -114,7 +114,8 @@ CREATE TYPE notification_kind AS ENUM(
     'community_join_request',
     'community_join_accepted',
     'topic_comment',
-    'topic_reply'
+    'topic_reply',
+    'media_comment'
 );
 
 CREATE TYPE report_reason AS ENUM(
@@ -309,6 +310,29 @@ CREATE INDEX idx_user_profile_name_trgm ON user_profile USING GIN(name gin_trgm_
 
 CREATE INDEX idx_user_profile_city_trgm ON user_profile USING GIN(city gin_trgm_ops);
 
+-- Álbum de fotos. A capa é uma FK circular com `user_media`, então entra por
+-- ALTER TABLE depois das duas tabelas existirem.
+CREATE TABLE album(
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    cover_media_id UUID,
+    -- Privacidade própria, mais fechada que o perfil se o dono quiser. O
+    -- `profile_visibility` continua mandando por cima.
+    visibility visibility NOT NULL DEFAULT 'everyone',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT check_album_title_length CHECK (CHAR_LENGTH(title) BETWEEN 1 AND 100),
+    CONSTRAINT check_album_description_length CHECK (description IS NULL
+        OR CHAR_LENGTH(description) <= 2000)
+);
+
+SELECT
+    set_updated_at_for('album');
+
+CREATE INDEX idx_album_owner ON album(user_id, id DESC);
+
 CREATE TABLE user_media(
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
     user_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
@@ -318,15 +342,53 @@ CREATE TABLE user_media(
     storage_key TEXT NOT NULL UNIQUE,
     content_type TEXT NOT NULL,
     size_bytes BIGINT NOT NULL,
+    -- Foto solta continua existindo: o álbum é opcional. Apagar o álbum leva as
+    -- fotos dele junto, que é o que quem clica em "apagar álbum" espera.
+    album_id UUID REFERENCES album(id) ON DELETE CASCADE,
+    caption TEXT,
+    -- Ordem dentro do álbum. Empate resolve pelo id, que é cronológico.
+    position SMALLINT NOT NULL DEFAULT 0,
+    -- Remoção pela moderação. O dono apaga de verdade, com arquivo e tudo; a
+    -- moderação só tira do ar, para poder devolver.
+    deleted_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT check_user_media_size CHECK (size_bytes > 0)
+    CONSTRAINT check_user_media_size CHECK (size_bytes > 0),
+    CONSTRAINT check_user_media_caption_length CHECK (caption IS NULL
+        OR CHAR_LENGTH(caption) <= 500)
 );
 
 SELECT
     set_updated_at_for('user_media');
 
 CREATE INDEX idx_user_media_gallery ON user_media(user_id, kind, id DESC);
+
+CREATE INDEX idx_user_media_album ON user_media(album_id, position, id)
+WHERE
+    album_id IS NOT NULL;
+
+ALTER TABLE album
+    ADD CONSTRAINT fk_album_cover FOREIGN KEY (cover_media_id) REFERENCES user_media(id) ON DELETE SET NULL;
+
+-- Comentário em foto, linear: a conversa é embaixo da imagem, sem thread. O
+-- corpo fica na linha depois do soft delete, como no recado, para a moderação.
+CREATE TABLE media_comment(
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    media_id UUID NOT NULL REFERENCES user_media(id) ON DELETE CASCADE,
+    author_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    deleted_at TIMESTAMPTZ DEFAULT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT check_media_comment_body_length CHECK (CHAR_LENGTH(body) BETWEEN 1 AND 1000)
+);
+
+SELECT
+    set_updated_at_for('media_comment');
+
+CREATE INDEX idx_media_comment_thread ON media_comment(media_id, created_at)
+WHERE
+    deleted_at IS NULL;
 
 CREATE TABLE friend_request(
     id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
@@ -611,6 +673,7 @@ CREATE TABLE notification(
     community_id UUID REFERENCES community(id) ON DELETE CASCADE,
     topic_id UUID REFERENCES community_topic(id) ON DELETE CASCADE,
     comment_id UUID REFERENCES community_topic_comment(id) ON DELETE CASCADE,
+    media_id UUID REFERENCES user_media(id) ON DELETE CASCADE,
     read_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT check_notification_not_self CHECK (actor_id IS NULL OR actor_id <> user_id)
@@ -696,8 +759,10 @@ CREATE TABLE report(
     topic_id UUID REFERENCES community_topic(id) ON DELETE CASCADE,
     comment_id UUID REFERENCES community_topic_comment(id) ON DELETE CASCADE,
     poll_id UUID REFERENCES community_poll(id) ON DELETE CASCADE,
+    media_id UUID REFERENCES user_media(id) ON DELETE CASCADE,
+    media_comment_id UUID REFERENCES media_comment(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT check_report_single_target CHECK (num_nonnulls(reported_user_id, scrap_id, testimonial_id, community_id, topic_id, comment_id, poll_id) = 1)
+    CONSTRAINT check_report_single_target CHECK (num_nonnulls(reported_user_id, scrap_id, testimonial_id, community_id, topic_id, comment_id, poll_id, media_id, media_comment_id) = 1)
 );
 
 CREATE INDEX idx_report_queue ON report(created_at)
@@ -819,6 +884,8 @@ CREATE TABLE moderation_log(
     topic_id UUID REFERENCES community_topic(id) ON DELETE SET NULL,
     comment_id UUID REFERENCES community_topic_comment(id) ON DELETE SET NULL,
     poll_id UUID REFERENCES community_poll(id) ON DELETE SET NULL,
+    media_id UUID REFERENCES user_media(id) ON DELETE SET NULL,
+    media_comment_id UUID REFERENCES media_comment(id) ON DELETE SET NULL,
     -- Cópia do slug e do nome de quem sofreu a ação, para o histórico continuar
     -- legível depois que a conta ou a comunidade some.
     target_label TEXT,

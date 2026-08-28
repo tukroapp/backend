@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT action AS \"action: ModerationAction\"\n        FROM moderation_log\n        WHERE action IN ('content_removed', 'content_restored')\n          AND (scrap_id = $1 OR testimonial_id = $2 OR community_id = $3\n               OR topic_id = $4 OR comment_id = $5 OR poll_id = $6)\n        ORDER BY id DESC\n        LIMIT 1\n        ",
+  "query": "\n        SELECT action AS \"action: ModerationAction\"\n        FROM moderation_log\n        WHERE action IN ('content_removed', 'content_restored')\n          AND (scrap_id = $1 OR testimonial_id = $2 OR community_id = $3\n               OR topic_id = $4 OR comment_id = $5 OR poll_id = $6\n               OR media_id = $7 OR media_comment_id = $8)\n        ORDER BY id DESC\n        LIMIT 1\n        ",
   "describe": {
     "columns": [
       {
@@ -34,6 +34,8 @@
         "Uuid",
         "Uuid",
         "Uuid",
+        "Uuid",
+        "Uuid",
         "Uuid"
       ]
     },
@@ -41,5 +43,5 @@
       false
     ]
   },
-  "hash": "ba1f1e75a77a57bb37f4aec3ed873b4f270cb8c39953b65109c5e1318de92834"
+  "hash": "4a8b5c27a5cdbc78f5ba5dcd89ca13c45571e3d46d4320895007b2591cdf8654"
 }

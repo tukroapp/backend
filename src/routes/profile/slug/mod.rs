@@ -167,6 +167,11 @@ pub struct ProfileResponse {
 /// quem está olhando (`viewer` é `None` quando a requisição é anônima).
 pub struct ProfileTarget {
     pub user_id: Uuid,
+    /// Quem está olhando é o dono do perfil.
+    pub is_self: bool,
+    /// Quem está olhando é amigo do dono. Junto do `is_self`, é o que resolve a
+    /// visibilidade de cada álbum.
+    pub is_friend: bool,
     pub can_view_profile_details: bool,
     pub can_read_scrap: bool,
     pub can_write_scrap: bool,
@@ -185,7 +190,7 @@ pub struct ProfileTarget {
 
 /// Resolve uma preferência de privacidade para quem está olhando. O dono do
 /// perfil sempre passa, inclusive em `nobody`.
-fn allows(visibility: Visibility, is_self: bool, is_friend: bool) -> bool {
+pub fn allows(visibility: Visibility, is_self: bool, is_friend: bool) -> bool {
     match visibility {
         Visibility::Everyone => true,
         Visibility::Friends => is_self || is_friend,
@@ -263,6 +268,8 @@ pub async fn fetch_target(
 
         ProfileTarget {
             user_id: row.user_id,
+            is_self,
+            is_friend: row.is_friend,
             can_view_profile_details: allows(row.profile_visibility, is_self, row.is_friend),
             can_read_scrap: allows(row.scrap_read, is_self, row.is_friend),
             // Escrever exige sessão, então o anônimo nunca pode, mesmo em `everyone`.

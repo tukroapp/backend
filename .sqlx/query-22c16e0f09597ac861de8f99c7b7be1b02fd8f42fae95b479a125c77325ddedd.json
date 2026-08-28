@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        r.id,\n                        r.reason::TEXT AS \"reason!\",\n                        r.status::TEXT AS \"status!\",\n                        r.created_at,\n                        reporter.slug AS reporter_slug\n                    FROM report r\n                    INNER JOIN user_profile reporter ON reporter.user_id = r.reporter_id\n                    LEFT JOIN scrap s ON s.id = r.scrap_id\n                    LEFT JOIN testimonial t ON t.id = r.testimonial_id\n                    LEFT JOIN community_topic ct ON ct.id = r.topic_id\n                    LEFT JOIN community_topic_comment cc ON cc.id = r.comment_id\n                    LEFT JOIN community_poll cp ON cp.id = r.poll_id\n                    LEFT JOIN user_media um ON um.id = r.media_id\n                    LEFT JOIN media_comment mc ON mc.id = r.media_comment_id\n                    WHERE r.id <> $2\n                      AND COALESCE(r.reported_user_id, s.author_id, t.author_id, ct.author_id,\n                                   cc.author_id, cp.author_id, um.user_id, mc.author_id) = $1\n                    ORDER BY r.id DESC\n                    LIMIT $3\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "report",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "reason!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "status!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "report",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "reporter_slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "22c16e0f09597ac861de8f99c7b7be1b02fd8f42fae95b479a125c77325ddedd"
+}

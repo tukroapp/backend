@@ -1,0 +1,108 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            a.id,\n            a.title,\n            a.description,\n            a.visibility AS \"visibility: Visibility\",\n            a.created_at,\n            cover.storage_key AS \"cover_key?\",\n            (\n                SELECT COUNT(*) FROM user_media m\n                WHERE m.album_id = a.id AND m.deleted_at IS NULL\n            ) AS \"photos_count!\"\n        FROM album a\n        LEFT JOIN user_media cover ON cover.id = a.cover_media_id\n        WHERE a.user_id = $1\n          AND ($2::uuid IS NULL OR a.id < $2::uuid)\n        ORDER BY a.id DESC\n        LIMIT $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "visibility"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "cover_key?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_media",
+            "name": "storage_key"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "photos_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "fdaa01fe94234229ae03af2fdbc6fac5ee2adc0ff9ee4769f54ec4023d13ab0b"
+}

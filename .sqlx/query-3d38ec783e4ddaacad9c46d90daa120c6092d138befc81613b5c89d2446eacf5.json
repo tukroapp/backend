@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            m.user_id,\n            up.slug,\n            a.visibility AS \"album_visibility?: Visibility\"\n        FROM user_media m\n        INNER JOIN user_profile up ON up.user_id = m.user_id\n        LEFT JOIN album a ON a.id = m.album_id\n        WHERE m.id = $1 AND m.deleted_at IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "user_media",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "album_visibility?: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "visibility",
+            "kind": {
+              "Enum": [
+                "everyone",
+                "friends",
+                "nobody"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "album",
+            "name": "visibility"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "3d38ec783e4ddaacad9c46d90daa120c6092d138befc81613b5c89d2446eacf5"
+}

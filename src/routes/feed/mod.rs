@@ -109,7 +109,7 @@ pub async fn list(
         INNER JOIN user_profile ap ON ap.user_id = a.actor_id
         LEFT JOIN user_profile tu ON tu.user_id = a.target_user_id
         LEFT JOIN community c ON c.id = a.community_id
-        LEFT JOIN user_media m ON m.id = a.media_id
+        LEFT JOIN user_media m ON m.id = a.media_id AND m.deleted_at IS NULL
         WHERE a.actor_id <> $1
           -- Comunidade removida pela moderação some do feed junto.
           AND (a.community_id IS NULL OR c.deleted_at IS NULL)

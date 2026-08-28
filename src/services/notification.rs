@@ -16,6 +16,7 @@ pub enum NotificationKind {
     TopicComment,
     TopicReply,
     NewFan,
+    MediaComment,
 }
 
 /// O que originou a notificação. A tabela tem uma coluna por tipo de alvo, e
@@ -33,6 +34,9 @@ pub enum NotificationTarget {
         topic_id: Uuid,
         comment_id: Uuid,
     },
+    /// A foto comentada. O comentário em si não vai no link: a página da foto
+    /// abre com a conversa inteira embaixo.
+    Media(Uuid),
 }
 
 /// Cria a notificação. Vira no-op quando o ator é o próprio destinatário, o que
@@ -51,23 +55,34 @@ pub async fn notify(
         return Ok(());
     }
 
-    let (scrap_id, testimonial_id, friend_request_id, community_id, topic_id, comment_id) =
+    let (scrap_id, testimonial_id, friend_request_id, community_id, topic_id, comment_id, media_id) =
         match target {
-            NotificationTarget::Scrap(id) => (Some(id), None, None, None, None, None),
-            NotificationTarget::Testimonial(id) => (None, Some(id), None, None, None, None),
-            NotificationTarget::FriendRequest(id) => (None, None, Some(id), None, None, None),
-            NotificationTarget::Community(id) => (None, None, None, Some(id), None, None),
-            NotificationTarget::Topic(id) => (None, None, None, None, Some(id), None),
+            NotificationTarget::Scrap(id) => (Some(id), None, None, None, None, None, None),
+            NotificationTarget::Testimonial(id) => (None, Some(id), None, None, None, None, None),
+            NotificationTarget::FriendRequest(id) => (None, None, Some(id), None, None, None, None),
+            NotificationTarget::Community(id) => (None, None, None, Some(id), None, None, None),
+            NotificationTarget::Topic(id) => (None, None, None, None, Some(id), None, None),
             NotificationTarget::Comment {
                 topic_id,
                 comment_id,
-            } => (None, None, None, None, Some(topic_id), Some(comment_id)),
+            } => (
+                None,
+                None,
+                None,
+                None,
+                Some(topic_id),
+                Some(comment_id),
+                None,
+            ),
+            NotificationTarget::Media(id) => (None, None, None, None, None, None, Some(id)),
         };
 
     sqlx::query!(
         r#"
-        INSERT INTO notification (user_id, actor_id, kind, scrap_id, testimonial_id, friend_request_id, community_id, topic_id, comment_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO notification
+            (user_id, actor_id, kind, scrap_id, testimonial_id, friend_request_id,
+             community_id, topic_id, comment_id, media_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         "#,
         user_id,
         actor_id,
@@ -78,6 +93,7 @@ pub async fn notify(
         community_id,
         topic_id,
         comment_id,
+        media_id,
     )
     .execute(executor)
     .await?;

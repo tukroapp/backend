@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO user_media (user_id, kind, storage_key, content_type, size_bytes)\n        VALUES ($1, $2, $3, $4, $5)\n        RETURNING id, created_at\n        ",
+  "query": "\n        INSERT INTO user_media\n            (user_id, kind, storage_key, content_type, size_bytes, album_id, caption)\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        RETURNING id, created_at\n        ",
   "describe": {
     "columns": [
       {
@@ -42,7 +42,9 @@
         },
         "Text",
         "Text",
-        "Int8"
+        "Int8",
+        "Uuid",
+        "Text"
       ]
     },
     "nullable": [
@@ -50,5 +52,5 @@
       false
     ]
   },
-  "hash": "c26f28216d48cbd83b5c34a01eb5ec53ebdfd4dfb8a5d0974cf255e25c979194"
+  "hash": "b9f75d5ace59fa918d5a0e63112d6fcfe2e2e03dfb8bc0d2163a16b216fd89a7"
 }

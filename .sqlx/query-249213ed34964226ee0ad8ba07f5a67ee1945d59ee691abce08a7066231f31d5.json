@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE media_comment c\n        SET deleted_at = NOW()\n        WHERE c.id = $1\n          AND c.media_id = $2\n          AND c.deleted_at IS NULL\n          AND (\n              c.author_id = $3\n              OR EXISTS (\n                  SELECT 1 FROM user_media m\n                  WHERE m.id = c.media_id AND m.user_id = $3\n              )\n          )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "249213ed34964226ee0ad8ba07f5a67ee1945d59ee691abce08a7066231f31d5"
+}

@@ -53,6 +53,8 @@ enum ReportTarget {
     Topic(Uuid),
     Comment(Uuid),
     Poll(Uuid),
+    Media(Uuid),
+    MediaComment(Uuid),
 }
 
 /// As sete colunas de alvo da tabela, na ordem do INSERT. Só uma é `Some`.
@@ -64,6 +66,8 @@ struct TargetColumns {
     topic: Option<Uuid>,
     comment: Option<Uuid>,
     poll: Option<Uuid>,
+    media: Option<Uuid>,
+    media_comment: Option<Uuid>,
 }
 
 impl ReportTarget {
@@ -76,6 +80,8 @@ impl ReportTarget {
             topic: None,
             comment: None,
             poll: None,
+            media: None,
+            media_comment: None,
         };
 
         match self {
@@ -86,6 +92,8 @@ impl ReportTarget {
             ReportTarget::Topic(id) => columns.topic = Some(id),
             ReportTarget::Comment(id) => columns.comment = Some(id),
             ReportTarget::Poll(id) => columns.poll = Some(id),
+            ReportTarget::Media(id) => columns.media = Some(id),
+            ReportTarget::MediaComment(id) => columns.media_comment = Some(id),
         }
 
         columns
@@ -140,9 +148,10 @@ async fn create(
         INSERT INTO report (
             reporter_id, reason, details,
             reported_user_id, scrap_id, testimonial_id,
-            community_id, topic_id, comment_id, poll_id
+            community_id, topic_id, comment_id, poll_id,
+            media_id, media_comment_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT DO NOTHING
         RETURNING id, created_at
         "#,
@@ -156,6 +165,8 @@ async fn create(
         columns.topic,
         columns.comment,
         columns.poll,
+        columns.media,
+        columns.media_comment,
     )
     .fetch_optional(pool)
     .await
@@ -519,6 +530,106 @@ pub async fn poll(
         session.user_id,
         &payload,
         ReportTarget::Poll(id),
+    )
+    .await
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/report/media/{id}",
+    description = "Denuncia uma foto ou vídeo",
+    params(("id" = Uuid, Path, description = "Id do arquivo")),
+    request_body = ReportRequest,
+    responses(
+        (status = 201, description = "Denúncia registrada", body = ApiResponse<ReportResponse>),
+        (status = 400, description = "Motivo inválido, detalhes muito longos ou conteúdo próprio", body = ApiErrorResponse),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 404, description = "Arquivo não encontrado", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Denuncia uma foto", skip_all)]
+pub async fn media(
+    id: Path<Uuid>,
+    payload: Json<ReportRequest>,
+    session: SessionData,
+    pool: Data<PgPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    if let Some(response) = validate(&payload) {
+        return Ok(response);
+    }
+
+    let id = id.into_inner();
+    let owner_id = sqlx::query_scalar!(
+        r#"SELECT user_id FROM user_media WHERE id = $1 AND deleted_at IS NULL"#,
+        id,
+    )
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let Some(owner_id) = owner_id else {
+        return Ok(target_not_found("media", "Arquivo não encontrado."));
+    };
+
+    if owner_id == session.user_id {
+        return Ok(self_report());
+    }
+
+    create(
+        pool.get_ref(),
+        session.user_id,
+        &payload,
+        ReportTarget::Media(id),
+    )
+    .await
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/report/media-comment/{id}",
+    description = "Denuncia um comentário de foto",
+    params(("id" = Uuid, Path, description = "Id do comentário")),
+    request_body = ReportRequest,
+    responses(
+        (status = 201, description = "Denúncia registrada", body = ApiResponse<ReportResponse>),
+        (status = 400, description = "Motivo inválido, detalhes muito longos ou conteúdo próprio", body = ApiErrorResponse),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 404, description = "Comentário não encontrado", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Denuncia um comentário de foto", skip_all)]
+pub async fn media_comment(
+    id: Path<Uuid>,
+    payload: Json<ReportRequest>,
+    session: SessionData,
+    pool: Data<PgPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    if let Some(response) = validate(&payload) {
+        return Ok(response);
+    }
+
+    let id = id.into_inner();
+    let author_id = sqlx::query_scalar!(
+        r#"SELECT author_id FROM media_comment WHERE id = $1 AND deleted_at IS NULL"#,
+        id,
+    )
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(db_err)?;
+
+    let Some(author_id) = author_id else {
+        return Ok(target_not_found("comment", "Comentário não encontrado."));
+    };
+
+    if author_id == session.user_id {
+        return Ok(self_report());
+    }
+
+    create(
+        pool.get_ref(),
+        session.user_id,
+        &payload,
+        ReportTarget::MediaComment(id),
     )
     .await
 }

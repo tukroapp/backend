@@ -1,7 +1,9 @@
-use actix_multipart::form::{MultipartForm, tempfile::TempFile};
+pub mod comments;
+
+use actix_multipart::form::{MultipartForm, tempfile::TempFile, text::Text};
 use actix_web::{
     HttpResponse, Responder,
-    web::{Data, Path},
+    web::{Data, Json, Path},
 };
 use chrono::{DateTime, Utc};
 use mime_guess::mime;
@@ -9,11 +11,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgExecutor, PgPool};
 use utoipa::ToSchema;
 use uuid::Uuid;
+use validator::Validate;
 
 use std::{io::Read, sync::Arc};
 
 use crate::{
-    constants::{MAX_PHOTOS_PER_USER, MAX_UPLOAD_SIZE_BYTES, MAX_VIDEOS_PER_USER},
+    constants::{
+        MAX_PHOTOS_PER_ALBUM, MAX_PHOTOS_PER_USER, MAX_UPLOAD_SIZE_BYTES, MAX_VIDEOS_PER_USER,
+    },
     services::{
         activity::{NewActivity, record_activity},
         auth::SessionData,
@@ -47,6 +52,11 @@ pub struct MediaResponse {
     pub url: String,
     pub content_type: String,
     pub size_bytes: i64,
+    pub caption: Option<String>,
+    /// `null` quando a foto está solta, fora de qualquer álbum.
+    pub album_id: Option<Uuid>,
+    pub position: i16,
+    pub comments_count: i64,
     pub created_at: DateTime<Utc>,
 }
 
@@ -56,6 +66,11 @@ pub struct MediaUpload {
     #[multipart(limit = "25 MiB")]
     #[schema(value_type = String, format = Binary)]
     pub file: TempFile,
+    /// Álbum de destino. Sem ele, o arquivo fica solto na galeria.
+    #[schema(value_type = Option<String>)]
+    pub album_id: Option<Text<Uuid>>,
+    #[schema(value_type = Option<String>)]
+    pub caption: Option<Text<String>>,
 }
 
 /// Descarte pelo nome do arquivo, só para falhar antes de ler 25 MB do disco.
@@ -77,7 +92,7 @@ fn unsupported_media() -> HttpResponse {
     )
 }
 
-fn media_not_found() -> HttpResponse {
+pub fn media_not_found() -> HttpResponse {
     HttpResponse::NotFound().json(ApiErrorResponse::from_single_validation_error(
         "media",
         "not_found",
@@ -143,9 +158,17 @@ pub async fn fetch_media(
             storage_key,
             content_type,
             size_bytes,
-            created_at
+            caption,
+            album_id,
+            position,
+            created_at,
+            (
+                SELECT COUNT(*) FROM media_comment mc
+                WHERE mc.media_id = user_media.id AND mc.deleted_at IS NULL
+            ) AS "comments_count!"
         FROM user_media
         WHERE user_id = $1
+          AND deleted_at IS NULL
           AND ($2::media_kind IS NULL OR kind = $2)
           AND ($3::uuid IS NULL OR id < $3::uuid)
         ORDER BY id DESC
@@ -168,6 +191,10 @@ pub async fn fetch_media(
             url: storage.public_url(&row.storage_key),
             content_type: row.content_type,
             size_bytes: row.size_bytes,
+            caption: row.caption,
+            album_id: row.album_id,
+            position: row.position,
+            comments_count: row.comments_count,
             created_at: row.created_at,
         })
         .collect())
@@ -234,6 +261,33 @@ pub async fn post(
         return Ok(media_limit_reached(kind));
     }
 
+    let album_id = form.album_id.as_ref().map(|album| album.0);
+    let caption = form
+        .caption
+        .as_ref()
+        .map(|caption| caption.0.trim().to_string())
+        .filter(|caption| !caption.is_empty());
+
+    if let Some(caption) = &caption
+        && caption.chars().count() > 500
+    {
+        return Ok(invalid_field(
+            "caption",
+            "too_long",
+            "A legenda pode ter no máximo 500 caracteres.",
+        ));
+    }
+
+    // O álbum precisa ser seu e ter espaço. Vídeo não entra em álbum: álbum é
+    // de foto, e o vídeo fica na galeria.
+    if let Some(album_id) = album_id {
+        match album_room(pool.get_ref(), session.user_id, album_id).await? {
+            AlbumRoom::NotFound => return Ok(album_not_found()),
+            AlbumRoom::Full => return Ok(album_full()),
+            AlbumRoom::Available => {}
+        }
+    }
+
     let key = storage
         .upload(MEDIA_PREFIX, &session.user_id, &data, file)
         .await
@@ -251,8 +305,9 @@ pub async fn post(
 
     let created = sqlx::query!(
         r#"
-        INSERT INTO user_media (user_id, kind, storage_key, content_type, size_bytes)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO user_media
+            (user_id, kind, storage_key, content_type, size_bytes, album_id, caption)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, created_at
         "#,
         session.user_id,
@@ -260,6 +315,8 @@ pub async fn post(
         key,
         file.content_type,
         size_bytes,
+        album_id,
+        caption,
     )
     .fetch_one(&mut *tx)
     .await;
@@ -292,6 +349,10 @@ pub async fn post(
             url: storage.public_url(&key),
             content_type: file.content_type.to_string(),
             size_bytes,
+            caption: caption.clone(),
+            album_id,
+            position: 0,
+            comments_count: 0,
             created_at: created.created_at,
         })),
     )
@@ -334,6 +395,197 @@ pub async fn delete(
 
     if let Err(error) = storage.delete(&key).await {
         tracing::error!(%error, "falha ao remover o arquivo do álbum");
+    }
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// O que impede (ou não) mais uma foto no álbum.
+enum AlbumRoom {
+    NotFound,
+    Full,
+    Available,
+}
+
+async fn album_room(
+    pool: &PgPool,
+    user_id: Uuid,
+    album_id: Uuid,
+) -> Result<AlbumRoom, actix_web::Error> {
+    let count = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) AS "count!"
+        FROM user_media
+        WHERE album_id = $1
+          AND EXISTS (SELECT 1 FROM album WHERE id = $1 AND user_id = $2)
+        "#,
+        album_id,
+        user_id,
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(db_err)?;
+
+    let exists = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM album WHERE id = $1 AND user_id = $2) AS "exists!""#,
+        album_id,
+        user_id,
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(db_err)?;
+
+    if !exists {
+        return Ok(AlbumRoom::NotFound);
+    }
+
+    if count >= MAX_PHOTOS_PER_ALBUM {
+        return Ok(AlbumRoom::Full);
+    }
+
+    Ok(AlbumRoom::Available)
+}
+
+pub fn album_not_found() -> HttpResponse {
+    HttpResponse::NotFound().json(ApiErrorResponse::from_single_validation_error(
+        "album",
+        "not_found",
+        Some("Álbum não encontrado."),
+        vec![],
+    ))
+}
+
+fn album_full() -> HttpResponse {
+    let message = format!("Esse álbum já tem {MAX_PHOTOS_PER_ALBUM} fotos.");
+
+    HttpResponse::Conflict().json(ApiErrorResponse::from_single_validation_error(
+        "album",
+        "album_full",
+        Some(&message),
+        vec![],
+    ))
+}
+
+/// As fotos de um álbum, na ordem que o dono definiu. Sem paginação: o álbum
+/// tem teto de fotos, então a página inteira cabe numa resposta.
+pub async fn fetch_album_media(
+    pool: &PgPool,
+    storage: &dyn StorageService,
+    album_id: Uuid,
+) -> Result<Vec<MediaResponse>, actix_web::Error> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT
+            id,
+            kind AS "kind: MediaKind",
+            storage_key,
+            content_type,
+            size_bytes,
+            caption,
+            album_id,
+            position,
+            created_at,
+            (
+                SELECT COUNT(*) FROM media_comment mc
+                WHERE mc.media_id = user_media.id AND mc.deleted_at IS NULL
+            ) AS "comments_count!"
+        FROM user_media
+        WHERE album_id = $1 AND deleted_at IS NULL
+        ORDER BY position, id
+        "#,
+        album_id,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(db_err)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| MediaResponse {
+            id: row.id,
+            kind: row.kind,
+            url: storage.public_url(&row.storage_key),
+            content_type: row.content_type,
+            size_bytes: row.size_bytes,
+            caption: row.caption,
+            album_id: row.album_id,
+            position: row.position,
+            comments_count: row.comments_count,
+            created_at: row.created_at,
+        })
+        .collect())
+}
+
+#[derive(Debug, Deserialize, ToSchema, Validate)]
+pub struct MediaEditRequest {
+    #[validate(length(max = 500))]
+    pub caption: Option<String>,
+    /// Move a foto para outro álbum. `null` mantém onde está.
+    pub album_id: Option<Uuid>,
+    /// Posição dentro do álbum, para ordenar a página.
+    pub position: Option<i16>,
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/me/media/{id}",
+    description = "Edita a legenda, o álbum e a posição de uma foto",
+    params(("id" = Uuid, Path, description = "Id do arquivo")),
+    request_body = MediaEditRequest,
+    responses(
+        (status = 204, description = "Arquivo atualizado"),
+        (status = 400, description = "Dados inválidos", body = ApiErrorResponse),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+        (status = 404, description = "Arquivo ou álbum não encontrado", body = ApiErrorResponse),
+        (status = 409, description = "O álbum de destino está cheio", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Edita uma foto", skip_all)]
+pub async fn put(
+    id: Path<Uuid>,
+    payload: Json<MediaEditRequest>,
+    session: SessionData,
+    pool: Data<PgPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    if let Err(errors) = payload.validate() {
+        return Ok(HttpResponse::BadRequest().json(ApiErrorResponse::from(errors)));
+    }
+
+    if let Some(album_id) = payload.album_id {
+        match album_room(pool.get_ref(), session.user_id, album_id).await? {
+            AlbumRoom::NotFound => return Ok(album_not_found()),
+            AlbumRoom::Full => return Ok(album_full()),
+            AlbumRoom::Available => {}
+        }
+    }
+
+    let caption = payload
+        .caption
+        .as_deref()
+        .map(str::trim)
+        .filter(|caption| !caption.is_empty());
+
+    let updated = sqlx::query!(
+        r#"
+        UPDATE user_media
+        SET caption = $3,
+            album_id = COALESCE($4, album_id),
+            position = COALESCE($5, position)
+        WHERE id = $1 AND user_id = $2
+        "#,
+        id.into_inner(),
+        session.user_id,
+        caption,
+        payload.album_id,
+        payload.position,
+    )
+    .execute(pool.get_ref())
+    .await
+    .map_err(db_err)?
+    .rows_affected();
+
+    if updated == 0 {
+        return Ok(media_not_found());
     }
 
     Ok(HttpResponse::NoContent().finish())

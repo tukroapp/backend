@@ -8,8 +8,8 @@ use actix_web::{
 use crate::{
     middlewares::auth::{needs_authentication, needs_superuser, optional_authentication},
     routes::{
-        account, admin, auth, block, community, conversation, feed, friend, healthcheck, me, media,
-        notification, poll, profile, report, scrap, testimonial, topic,
+        account, admin, album, auth, block, community, conversation, feed, friend, healthcheck, me,
+        media, notification, poll, profile, report, scrap, testimonial, topic,
     },
     utils::{CustomIpExtractor, UserSessionExtractor},
 };
@@ -37,6 +37,8 @@ pub fn api_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         .service(scrap_urls(limits))
         .service(testimonial_urls(limits))
         .service(notification_urls(limits))
+        .service(album_urls(limits))
+        .service(media_urls(limits))
         .service(report_urls(limits))
         .service(admin_urls(limits))
 }
@@ -126,7 +128,17 @@ fn me_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
                 .route(delete().to(me::delete_avatar)),
         )
         .service(resource("/media").route(post().to(media::post)))
-        .service(resource("/media/{id}").route(delete().to(media::delete)))
+        .service(
+            resource("/media/{id}")
+                .route(put().to(media::put))
+                .route(delete().to(media::delete)),
+        )
+        .service(resource("/album").route(post().to(album::post)))
+        .service(
+            resource("/album/{id}")
+                .route(put().to(album::put))
+                .route(delete().to(album::delete)),
+        )
         .service(resource("/visitor").route(get().to(me::visitor)))
         .service(resource("/unread").route(get().to(me::unread)))
         .service(resource("/birthday").route(get().to(me::birthday)))
@@ -171,6 +183,7 @@ fn profile_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         )
         .service(resource("/{slug}/community").route(get().to(profile::slug::communities::get)))
         .service(resource("/{slug}/media").route(get().to(profile::slug::media::get)))
+        .service(resource("/{slug}/album").route(get().to(album::list)))
         .service(resource("/{slug}/message").route(post().to(profile::slug::messages::post)))
         .service(resource("/{slug}/idol").route(get().to(profile::slug::fans::idols)))
         .service(
@@ -331,6 +344,29 @@ fn admin_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         )
 }
 
+/// Leitura do álbum é pública, então o escopo usa autenticação opcional e o
+/// handler de escrita exige a sessão por conta própria.
+fn album_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
+    scope("/album")
+        .wrap(Governor::new(limits.permissive))
+        .wrap(from_fn(optional_authentication))
+        .service(resource("/{id}").route(get().to(album::detail)))
+}
+
+/// Mesmo arranjo: qualquer um lê os comentários de uma foto que alcança, e
+/// comentar exige sessão.
+fn media_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
+    scope("/media")
+        .wrap(Governor::new(limits.permissive))
+        .wrap(from_fn(optional_authentication))
+        .service(
+            resource("/{id}/comment")
+                .route(get().to(media::comments::get))
+                .route(post().to(media::comments::post)),
+        )
+        .service(resource("/{id}/comment/{comment_id}").route(delete().to(media::comments::delete)))
+}
+
 /// Denúncia usa o limite estrito por IP: é uma ação rara e cara de moderar.
 fn report_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
     scope("/report")
@@ -343,6 +379,8 @@ fn report_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
         .service(resource("/topic/{id}").route(post().to(report::topic)))
         .service(resource("/comment/{id}").route(post().to(report::comment)))
         .service(resource("/poll/{id}").route(post().to(report::poll)))
+        .service(resource("/media/{id}").route(post().to(report::media)))
+        .service(resource("/media-comment/{id}").route(post().to(report::media_comment)))
 }
 
 /// `/read-all` precisa vir antes de `/{id}`, senão o resource do id casa com a

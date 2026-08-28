@@ -23,5 +23,9 @@ pub const MAX_UPLOAD_SIZE_BYTES: usize = 25 * 1024 * 1024; // 25 MB
 pub const MAX_FRIENDS: i64 = 5_000;
 pub const MAX_COMMUNITIES_PER_USER: i64 = 1_000;
 
-pub const MAX_PHOTOS_PER_USER: i64 = 10;
-pub const MAX_VIDEOS_PER_USER: i64 = 5;
+// Os tetos de mídia são apertados de propósito: o bucket é o plano gratuito do
+// R2, e vídeo de 25 MB é o que estoura os 10 GB primeiro.
+pub const MAX_PHOTOS_PER_USER: i64 = 30;
+pub const MAX_VIDEOS_PER_USER: i64 = 2;
+pub const MAX_ALBUMS_PER_USER: i64 = 5;
+pub const MAX_PHOTOS_PER_ALBUM: i64 = 20;

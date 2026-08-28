@@ -2,6 +2,7 @@ mod account;
 mod admin_moderation;
 mod admin_report;
 mod admin_user;
+mod album;
 mod auth;
 mod birthday;
 mod block;

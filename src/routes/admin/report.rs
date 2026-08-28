@@ -195,6 +195,29 @@ pub enum ReportTargetDetail {
         community_slug: String,
         is_deleted: bool,
     },
+    Media {
+        id: Uuid,
+        /// URL pública do arquivo, para o moderador ver o que foi denunciado.
+        url: String,
+        /// `photo` ou `video`.
+        media_kind: String,
+        caption: Option<String>,
+        created_at: DateTime<Utc>,
+        /// Slug do dono, que responde pelo arquivo.
+        owner_slug: String,
+        is_deleted: bool,
+    },
+    MediaComment {
+        id: Uuid,
+        body: String,
+        created_at: DateTime<Utc>,
+        /// A foto comentada, com a URL para o moderador ver o contexto.
+        media_id: Uuid,
+        media_url: String,
+        /// Dono da foto, que não é quem escreveu o comentário.
+        media_owner_slug: String,
+        is_deleted: bool,
+    },
     Poll {
         id: Uuid,
         question: String,
@@ -256,7 +279,7 @@ fn report_not_found() -> HttpResponse {
     description = "Fila de denúncias para a moderação, da mais nova para a mais antiga, com o conteúdo denunciado e o histórico da conta responsável",
     params(
         ("status" = Option<String>, Query, description = "open, reviewing, resolved ou dismissed"),
-        ("kind" = Option<String>, Query, description = "profile, scrap, testimonial, community, topic, comment ou poll"),
+        ("kind" = Option<String>, Query, description = "profile, scrap, testimonial, community, topic, comment, poll, media ou media_comment"),
         CursorPaginationQuery,
     ),
     responses(
@@ -286,13 +309,21 @@ pub async fn get(
     if let Some(kind) = query.kind.as_deref()
         && !matches!(
             kind,
-            "profile" | "scrap" | "testimonial" | "community" | "topic" | "comment" | "poll"
+            "profile"
+                | "scrap"
+                | "testimonial"
+                | "community"
+                | "topic"
+                | "comment"
+                | "poll"
+                | "media"
+                | "media_comment"
         )
     {
         return Ok(invalid_field(
             "kind",
             "invalid_kind",
-            "O tipo precisa ser 'profile', 'scrap', 'testimonial', 'community', 'topic', 'comment' ou 'poll'.",
+            "O tipo precisa ser 'profile', 'scrap', 'testimonial', 'community', 'topic', 'comment', 'poll', 'media' ou 'media_comment'.",
         ));
     }
 
@@ -318,18 +349,24 @@ pub async fn get(
                     WHEN r.community_id IS NOT NULL THEN 'community'
                     WHEN r.topic_id IS NOT NULL THEN 'topic'
                     WHEN r.comment_id IS NOT NULL THEN 'comment'
-                    ELSE 'poll'
+                    WHEN r.poll_id IS NOT NULL THEN 'poll'
+                    WHEN r.media_id IS NOT NULL THEN 'media'
+                    ELSE 'media_comment'
                 END AS target_kind,
                 COALESCE(r.reported_user_id, r.scrap_id, r.testimonial_id, r.community_id,
-                         r.topic_id, r.comment_id, r.poll_id) AS target_id,
+                         r.topic_id, r.comment_id, r.poll_id, r.media_id,
+                         r.media_comment_id) AS target_id,
                 COALESCE(r.reported_user_id, s.author_id, t.author_id, ct.author_id,
-                         cc.author_id, cp.author_id) AS accountable_id,
+                         cc.author_id, cp.author_id, um.user_id, mc.author_id) AS accountable_id,
                 COALESCE(reported.slug, wall.slug, target_profile.slug, c.slug,
-                         topic_community.slug, comment_community.slug, poll_community.slug) AS target_slug,
+                         topic_community.slug, comment_community.slug, poll_community.slug,
+                         media_owner.slug, comment_media_owner.slug) AS target_slug,
                 COALESCE(c.name, ct.title, comment_topic.title, cp.question) AS target_title,
-                LEFT(COALESCE(s.body, t.body, ct.body, cc.body), $4) AS target_excerpt,
+                LEFT(COALESCE(s.body, t.body, ct.body, cc.body, um.caption, mc.body), $4)
+                    AS target_excerpt,
                 COALESCE(s.deleted_at, t.deleted_at, c.deleted_at, ct.deleted_at,
-                         cc.deleted_at, cp.deleted_at) IS NOT NULL AS target_is_deleted
+                         cc.deleted_at, cp.deleted_at, um.deleted_at, mc.deleted_at)
+                    IS NOT NULL AS target_is_deleted
             FROM report r
             LEFT JOIN user_profile reported ON reported.user_id = r.reported_user_id
             LEFT JOIN scrap s ON s.id = r.scrap_id
@@ -344,6 +381,12 @@ pub async fn get(
             LEFT JOIN community comment_community ON comment_community.id = comment_topic.community_id
             LEFT JOIN community_poll cp ON cp.id = r.poll_id
             LEFT JOIN community poll_community ON poll_community.id = cp.community_id
+            LEFT JOIN user_media um ON um.id = r.media_id
+            LEFT JOIN user_profile media_owner ON media_owner.user_id = um.user_id
+            LEFT JOIN media_comment mc ON mc.id = r.media_comment_id
+            LEFT JOIN user_media comment_media ON comment_media.id = mc.media_id
+            LEFT JOIN user_profile comment_media_owner
+                ON comment_media_owner.user_id = comment_media.user_id
             WHERE ($1::TEXT IS NULL OR r.status::TEXT = $1)
               AND ($2::uuid IS NULL OR r.id < $2::uuid)
         )
@@ -442,6 +485,7 @@ pub async fn get(
 /// os campos que interessam ao moderador são diferentes.
 async fn load_target(
     pool: &PgPool,
+    storage: &dyn StorageService,
     report: &ReportRow,
 ) -> Result<Option<ReportTargetDetail>, actix_web::Error> {
     if report.reported_user_id.is_some() {
@@ -609,6 +653,69 @@ async fn load_target(
         }));
     }
 
+    if let Some(id) = report.media_id {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                m.storage_key,
+                m.kind::TEXT AS "kind!",
+                m.caption,
+                m.created_at,
+                m.deleted_at IS NOT NULL AS "is_deleted!",
+                up.slug AS owner_slug
+            FROM user_media m
+            INNER JOIN user_profile up ON up.user_id = m.user_id
+            WHERE m.id = $1
+            "#,
+            id,
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(db_err)?;
+
+        return Ok(row.map(|row| ReportTargetDetail::Media {
+            id,
+            url: storage.public_url(&row.storage_key),
+            media_kind: row.kind,
+            caption: row.caption,
+            created_at: row.created_at,
+            owner_slug: row.owner_slug,
+            is_deleted: row.is_deleted,
+        }));
+    }
+
+    if let Some(id) = report.media_comment_id {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                mc.body,
+                mc.created_at,
+                mc.deleted_at IS NOT NULL AS "is_deleted!",
+                m.id AS media_id,
+                m.storage_key,
+                up.slug AS media_owner_slug
+            FROM media_comment mc
+            INNER JOIN user_media m ON m.id = mc.media_id
+            INNER JOIN user_profile up ON up.user_id = m.user_id
+            WHERE mc.id = $1
+            "#,
+            id,
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(db_err)?;
+
+        return Ok(row.map(|row| ReportTargetDetail::MediaComment {
+            id,
+            body: row.body,
+            created_at: row.created_at,
+            media_id: row.media_id,
+            media_url: storage.public_url(&row.storage_key),
+            media_owner_slug: row.media_owner_slug,
+            is_deleted: row.is_deleted,
+        }));
+    }
+
     if let Some(id) = report.poll_id {
         let row = sqlx::query!(
             r#"
@@ -652,6 +759,8 @@ async fn load_target(
 
 /// A linha da denúncia com os ids de alvo, do jeito que `load_target` precisa.
 struct ReportRow {
+    media_id: Option<Uuid>,
+    media_comment_id: Option<Uuid>,
     reported_user_id: Option<Uuid>,
     scrap_id: Option<Uuid>,
     testimonial_id: Option<Uuid>,
@@ -760,8 +869,10 @@ pub async fn detail(
             r.topic_id,
             r.comment_id,
             r.poll_id,
+            r.media_id,
+            r.media_comment_id,
             COALESCE(r.reported_user_id, s.author_id, t.author_id, ct.author_id,
-                     cc.author_id, cp.author_id) AS accountable_id,
+                     cc.author_id, cp.author_id, um.user_id, mc.author_id) AS accountable_id,
             reporter.user_id AS reporter_id,
             reporter.slug AS reporter_slug,
             reporter.name AS reporter_name,
@@ -780,6 +891,8 @@ pub async fn detail(
         LEFT JOIN community_topic ct ON ct.id = r.topic_id
         LEFT JOIN community_topic_comment cc ON cc.id = r.comment_id
         LEFT JOIN community_poll cp ON cp.id = r.poll_id
+        LEFT JOIN user_media um ON um.id = r.media_id
+        LEFT JOIN media_comment mc ON mc.id = r.media_comment_id
         WHERE r.id = $1
         "#,
         id,
@@ -793,6 +906,8 @@ pub async fn detail(
     };
 
     let target_ids = ReportRow {
+        media_id: report.media_id,
+        media_comment_id: report.media_comment_id,
         reported_user_id: report.reported_user_id,
         scrap_id: report.scrap_id,
         testimonial_id: report.testimonial_id,
@@ -804,7 +919,7 @@ pub async fn detail(
 
     // O alvo só some quando a linha é apagada de verdade (comunidade excluída,
     // conta removida), e aí a denúncia perde o sentido.
-    let Some(target) = load_target(pool.get_ref(), &target_ids).await? else {
+    let Some(target) = load_target(pool.get_ref(), storage, &target_ids).await? else {
         return Ok(report_not_found());
     };
 
@@ -893,9 +1008,11 @@ pub async fn detail(
                     LEFT JOIN community_topic ct ON ct.id = r.topic_id
                     LEFT JOIN community_topic_comment cc ON cc.id = r.comment_id
                     LEFT JOIN community_poll cp ON cp.id = r.poll_id
+                    LEFT JOIN user_media um ON um.id = r.media_id
+                    LEFT JOIN media_comment mc ON mc.id = r.media_comment_id
                     WHERE r.id <> $2
                       AND COALESCE(r.reported_user_id, s.author_id, t.author_id, ct.author_id,
-                                   cc.author_id, cp.author_id) = $1
+                                   cc.author_id, cp.author_id, um.user_id, mc.author_id) = $1
                     ORDER BY r.id DESC
                     LIMIT $3
                     "#,

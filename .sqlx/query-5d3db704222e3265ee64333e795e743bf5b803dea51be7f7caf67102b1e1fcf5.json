@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_media\n        SET caption = $3,\n            album_id = COALESCE($4, album_id),\n            position = COALESCE($5, position)\n        WHERE id = $1 AND user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5d3db704222e3265ee64333e795e743bf5b803dea51be7f7caf67102b1e1fcf5"
+}

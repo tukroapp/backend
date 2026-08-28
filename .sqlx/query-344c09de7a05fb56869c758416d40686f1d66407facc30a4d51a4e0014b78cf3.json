@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            r.id,\n            r.reason::TEXT AS \"reason!\",\n            r.details,\n            r.status::TEXT AS \"status!\",\n            r.created_at,\n            r.reviewed_at,\n            r.reported_user_id,\n            r.scrap_id,\n            r.testimonial_id,\n            r.community_id,\n            r.topic_id,\n            r.comment_id,\n            r.poll_id,\n            COALESCE(r.reported_user_id, s.author_id, t.author_id, ct.author_id,\n                     cc.author_id, cp.author_id) AS accountable_id,\n            reporter.user_id AS reporter_id,\n            reporter.slug AS reporter_slug,\n            reporter.name AS reporter_name,\n            reporter.avatar_url AS reporter_avatar_url,\n            reporter.status AS reporter_status,\n            reviewer.user_id AS \"reviewer_id?\",\n            reviewer.slug AS \"reviewer_slug?\",\n            reviewer.name AS \"reviewer_name?\",\n            reviewer.avatar_url AS \"reviewer_avatar_url?\",\n            reviewer.status AS \"reviewer_status?\"\n        FROM report r\n        INNER JOIN user_profile reporter ON reporter.user_id = r.reporter_id\n        LEFT JOIN user_profile reviewer ON reviewer.user_id = r.reviewed_by\n        LEFT JOIN scrap s ON s.id = r.scrap_id\n        LEFT JOIN testimonial t ON t.id = r.testimonial_id\n        LEFT JOIN community_topic ct ON ct.id = r.topic_id\n        LEFT JOIN community_topic_comment cc ON cc.id = r.comment_id\n        LEFT JOIN community_poll cp ON cp.id = r.poll_id\n        WHERE r.id = $1\n        ",
+  "query": "\n        SELECT\n            r.id,\n            r.reason::TEXT AS \"reason!\",\n            r.details,\n            r.status::TEXT AS \"status!\",\n            r.created_at,\n            r.reviewed_at,\n            r.reported_user_id,\n            r.scrap_id,\n            r.testimonial_id,\n            r.community_id,\n            r.topic_id,\n            r.comment_id,\n            r.poll_id,\n            r.media_id,\n            r.media_comment_id,\n            COALESCE(r.reported_user_id, s.author_id, t.author_id, ct.author_id,\n                     cc.author_id, cp.author_id, um.user_id, mc.author_id) AS accountable_id,\n            reporter.user_id AS reporter_id,\n            reporter.slug AS reporter_slug,\n            reporter.name AS reporter_name,\n            reporter.avatar_url AS reporter_avatar_url,\n            reporter.status AS reporter_status,\n            reviewer.user_id AS \"reviewer_id?\",\n            reviewer.slug AS \"reviewer_slug?\",\n            reviewer.name AS \"reviewer_name?\",\n            reviewer.avatar_url AS \"reviewer_avatar_url?\",\n            reviewer.status AS \"reviewer_status?\"\n        FROM report r\n        INNER JOIN user_profile reporter ON reporter.user_id = r.reporter_id\n        LEFT JOIN user_profile reviewer ON reviewer.user_id = r.reviewed_by\n        LEFT JOIN scrap s ON s.id = r.scrap_id\n        LEFT JOIN testimonial t ON t.id = r.testimonial_id\n        LEFT JOIN community_topic ct ON ct.id = r.topic_id\n        LEFT JOIN community_topic_comment cc ON cc.id = r.comment_id\n        LEFT JOIN community_poll cp ON cp.id = r.poll_id\n        LEFT JOIN user_media um ON um.id = r.media_id\n        LEFT JOIN media_comment mc ON mc.id = r.media_comment_id\n        WHERE r.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -138,12 +138,34 @@
       },
       {
         "ordinal": 13,
+        "name": "media_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "report",
+            "name": "media_id"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "media_comment_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "report",
+            "name": "media_comment_id"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
         "name": "accountable_id",
         "type_info": "Uuid",
         "origin": "Expression"
       },
       {
-        "ordinal": 14,
+        "ordinal": 16,
         "name": "reporter_id",
         "type_info": "Uuid",
         "origin": {
@@ -154,7 +176,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 17,
         "name": "reporter_slug",
         "type_info": "Text",
         "origin": {
@@ -165,7 +187,7 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 18,
         "name": "reporter_name",
         "type_info": "Text",
         "origin": {
@@ -176,7 +198,7 @@
         }
       },
       {
-        "ordinal": 17,
+        "ordinal": 19,
         "name": "reporter_avatar_url",
         "type_info": "Text",
         "origin": {
@@ -187,7 +209,7 @@
         }
       },
       {
-        "ordinal": 18,
+        "ordinal": 20,
         "name": "reporter_status",
         "type_info": "Text",
         "origin": {
@@ -198,7 +220,7 @@
         }
       },
       {
-        "ordinal": 19,
+        "ordinal": 21,
         "name": "reviewer_id?",
         "type_info": "Uuid",
         "origin": {
@@ -209,7 +231,7 @@
         }
       },
       {
-        "ordinal": 20,
+        "ordinal": 22,
         "name": "reviewer_slug?",
         "type_info": "Text",
         "origin": {
@@ -220,7 +242,7 @@
         }
       },
       {
-        "ordinal": 21,
+        "ordinal": 23,
         "name": "reviewer_name?",
         "type_info": "Text",
         "origin": {
@@ -231,7 +253,7 @@
         }
       },
       {
-        "ordinal": 22,
+        "ordinal": 24,
         "name": "reviewer_avatar_url?",
         "type_info": "Text",
         "origin": {
@@ -242,7 +264,7 @@
         }
       },
       {
-        "ordinal": 23,
+        "ordinal": 25,
         "name": "reviewer_status?",
         "type_info": "Text",
         "origin": {
@@ -272,6 +294,8 @@
       true,
       true,
       true,
+      true,
+      true,
       null,
       false,
       false,
@@ -285,5 +309,5 @@
       true
     ]
   },
-  "hash": "9315ee42ac4270802123b85a4462d42e5a417716b8bd931e72182122319022b7"
+  "hash": "344c09de7a05fb56869c758416d40686f1d66407facc30a4d51a4e0014b78cf3"
 }
