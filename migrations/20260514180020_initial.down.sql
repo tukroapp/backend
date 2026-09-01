@@ -1,3 +1,7 @@
+DROP TABLE IF EXISTS terms_acceptance;
+
+DROP TABLE IF EXISTS access_log;
+
 DROP TABLE IF EXISTS moderation_log;
 
 DROP TABLE IF EXISTS activity;
@@ -83,6 +87,8 @@ DROP TYPE IF EXISTS relationship_status;
 DROP TYPE IF EXISTS visibility;
 
 DROP TYPE IF EXISTS account_status;
+
+DROP TYPE IF EXISTS login_method;
 
 DROP TYPE IF EXISTS token_type;
 

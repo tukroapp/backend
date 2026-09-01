@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            au.id,\n            au.email AS \"email!: String\",\n            au.is_email_verified,\n            au.is_superuser,\n            (au.google_id IS NOT NULL) AS \"is_google!\",\n            up.slug,\n            up.name,\n            up.avatar_url,\n            up.status,\n            up.bio,\n            up.city,\n            up.birthdate,\n            up.relationship_status AS \"relationship_status: RelationshipStatus\",\n            up.country,\n            up.state,\n            up.languages,\n            up.interests,\n            up.who_i_want_to_meet,\n            up.occupation,\n            up.company,\n            up.education,\n            up.music,\n            up.movies,\n            up.books,\n            up.tv_shows,\n            up.foods,\n            up.sports,\n            up.pets,\n            up.fashion_style,\n            up.profile_visibility AS \"profile_visibility: Visibility\",\n            up.scrap_read AS \"scrap_read: Visibility\",\n            up.scrap_write AS \"scrap_write: Visibility\",\n            up.testimonial_write AS \"testimonial_write: Visibility\",\n            up.message_receive AS \"message_receive: Visibility\",\n            up.show_profile_visits,\n            (\n                SELECT COUNT(*) FROM notification n\n                LEFT JOIN scrap s ON s.id = n.scrap_id\n                LEFT JOIN testimonial t ON t.id = n.testimonial_id\n                WHERE n.user_id = au.id\n                  AND n.read_at IS NULL\n                  AND s.deleted_at IS NULL\n                  AND t.deleted_at IS NULL\n                  AND NOT EXISTS (\n                      SELECT 1 FROM block b\n                      WHERE (b.blocker_id = n.user_id AND b.blocked_id = n.actor_id)\n                         OR (b.blocker_id = n.actor_id AND b.blocked_id = n.user_id)\n                  )\n            ) AS \"unread_notifications_count!\",\n            (\n                SELECT COUNT(*) FROM message m\n                INNER JOIN conversation_participant cp\n                    ON cp.conversation_id = m.conversation_id AND cp.user_id = au.id\n                WHERE m.sender_id <> au.id\n                  AND m.created_at > cp.last_read_at\n                  AND (cp.hidden_at IS NULL OR m.created_at > cp.hidden_at)\n            ) AS \"unread_messages_count!\"\n        FROM auth_user au\n        INNER JOIN user_profile up ON up.user_id = au.id\n        WHERE au.id = $1\n        ",
+  "query": "\n        SELECT\n            au.id,\n            au.email AS \"email!: String\",\n            au.is_email_verified,\n            au.is_superuser,\n            (au.google_id IS NOT NULL) AS \"is_google!\",\n            up.slug,\n            up.name,\n            up.avatar_url,\n            up.status,\n            up.bio,\n            up.city,\n            up.birthdate,\n            up.relationship_status AS \"relationship_status: RelationshipStatus\",\n            up.country,\n            up.state,\n            up.languages,\n            up.interests,\n            up.who_i_want_to_meet,\n            up.occupation,\n            up.company,\n            up.education,\n            up.music,\n            up.movies,\n            up.books,\n            up.tv_shows,\n            up.foods,\n            up.sports,\n            up.pets,\n            up.fashion_style,\n            up.profile_visibility AS \"profile_visibility: Visibility\",\n            up.scrap_read AS \"scrap_read: Visibility\",\n            up.scrap_write AS \"scrap_write: Visibility\",\n            up.testimonial_write AS \"testimonial_write: Visibility\",\n            up.message_receive AS \"message_receive: Visibility\",\n            up.show_profile_visits,\n            (\n                SELECT COUNT(*) FROM notification n\n                LEFT JOIN scrap s ON s.id = n.scrap_id\n                LEFT JOIN testimonial t ON t.id = n.testimonial_id\n                WHERE n.user_id = au.id\n                  AND n.read_at IS NULL\n                  AND s.deleted_at IS NULL\n                  AND t.deleted_at IS NULL\n                  AND NOT EXISTS (\n                      SELECT 1 FROM block b\n                      WHERE (b.blocker_id = n.user_id AND b.blocked_id = n.actor_id)\n                         OR (b.blocker_id = n.actor_id AND b.blocked_id = n.user_id)\n                  )\n            ) AS \"unread_notifications_count!\",\n            (\n                SELECT COUNT(*) FROM message m\n                INNER JOIN conversation_participant cp\n                    ON cp.conversation_id = m.conversation_id AND cp.user_id = au.id\n                WHERE m.sender_id <> au.id\n                  AND m.created_at > cp.last_read_at\n                  AND (cp.hidden_at IS NULL OR m.created_at > cp.hidden_at)\n            ) AS \"unread_messages_count!\",\n            (\n                SELECT $2::text\n                WHERE NOT EXISTS (\n                    SELECT 1 FROM terms_acceptance ta\n                    WHERE ta.user_id = au.id AND ta.version = $2\n                )\n            ) AS \"pending_terms_version\"\n        FROM auth_user au\n        INNER JOIN user_profile up ON up.user_id = au.id\n        WHERE au.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -471,11 +471,18 @@
         "name": "unread_messages_count!",
         "type_info": "Int8",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 37,
+        "name": "pending_terms_version",
+        "type_info": "Text",
+        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Text"
       ]
     },
     "nullable": [
@@ -515,8 +522,9 @@
       false,
       false,
       null,
+      null,
       null
     ]
   },
-  "hash": "fedc37a777f440541e3d0cd7c69e6cfc5d70eb603894b0f4358fc60c8b97acd0"
+  "hash": "0fa9452dd77d375c7d0a1dc8e38dd956488b9e40873257aafcc8da62f56fb65f"
 }

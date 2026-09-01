@@ -1,3 +1,4 @@
+pub mod access_log;
 pub mod account;
 pub mod activity;
 pub mod auth;
@@ -7,4 +8,5 @@ pub mod notification;
 pub mod seed;
 pub mod slug;
 pub mod storage;
+pub mod terms;
 pub mod visit;

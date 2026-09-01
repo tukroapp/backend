@@ -12,7 +12,10 @@ use crate::{
     configuration::{EmailSettings, Environment},
     constants::MAX_UPLOAD_SIZE_BYTES,
     middlewares::common,
-    services::{account::DeletionWorker, email::EmailWorker, storage::StorageService},
+    services::{
+        access_log::AccessLogPurgeWorker, account::DeletionWorker, email::EmailWorker,
+        storage::StorageService,
+    },
     utils::{
         CustomIpExtractor, UserSessionExtractor, json_parse_config, multipart_parse_config,
         not_found_service, path_parse_config, query_parse_config,
@@ -93,6 +96,9 @@ pub fn run(config: RunConfig) -> Result<Server, std::io::Error> {
             Arc::clone(storage_data.as_ref()),
         );
         tokio::spawn(async move { deletion_worker.run().await });
+
+        let access_log_worker = AccessLogPurgeWorker::new(db_pool.as_ref().clone());
+        tokio::spawn(async move { access_log_worker.run().await });
     }
 
     let strict_rate_limit_config = GovernorConfigBuilder::default()

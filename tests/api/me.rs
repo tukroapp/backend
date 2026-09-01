@@ -1,7 +1,21 @@
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::helpers::{TestApp, drop_app, spawn_app};
+use tukro_backend::constants::CURRENT_TERMS_VERSION;
+
+use crate::helpers::{RegisteredUser, TestApp, drop_app, register_and_login, spawn_app};
+
+async fn me_of(app: &TestApp, user: &RegisteredUser) -> serde_json::Value {
+    app.api_client
+        .get(format!("{}/api/v1/me", app.address))
+        .header(reqwest::header::AUTHORIZATION, user.auth_header())
+        .send()
+        .await
+        .expect("Failed to send request")
+        .json()
+        .await
+        .expect("me response not JSON")
+}
 
 #[tokio::test]
 async fn me_returns_fields_from_both_tables() {
@@ -544,4 +558,67 @@ async fn put_me_rejects_a_list_item_that_is_too_long() {
     // Assert
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(body["error"]["interests"][0]["code"], "item_too_long");
+}
+
+#[tokio::test]
+async fn a_new_terms_version_is_flagged_and_cleared_by_accepting_it() {
+    // Arrange
+    let app = spawn_app().await;
+    let user = register_and_login(&app, "Fulano").await;
+
+    let pending_after_register =
+        me_of(&app, &user).await["results"]["pending_terms_version"].clone();
+
+    // Simula a publicação de uma versão nova envelhecendo o aceite que existe.
+    sqlx::query!(
+        r#"
+        UPDATE terms_acceptance ta
+        SET version = 'antiga'
+        FROM auth_user au
+        WHERE au.id = ta.user_id AND au.email = $1
+        "#,
+        user.email,
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to age the acceptance");
+
+    let pending_after_bump = me_of(&app, &user).await["results"]["pending_terms_version"].clone();
+
+    // Act
+    let accepted = app
+        .api_client
+        .post(format!("{}/api/v1/me/terms", &app.address))
+        .header(reqwest::header::AUTHORIZATION, user.auth_header())
+        .send()
+        .await
+        .expect("Failed to accept the terms");
+
+    let accept_status = accepted.status();
+    let pending_after_accept = me_of(&app, &user).await["results"]["pending_terms_version"].clone();
+
+    let versions = sqlx::query_scalar!(
+        r#"
+        SELECT ta.version
+        FROM terms_acceptance ta
+        INNER JOIN auth_user au ON au.id = ta.user_id
+        WHERE au.email = $1
+        ORDER BY ta.accepted_at
+        "#,
+        user.email,
+    )
+    .fetch_all(&app.db_pool)
+    .await
+    .expect("Failed to read the acceptance history");
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert!(pending_after_register.is_null());
+    assert_eq!(pending_after_bump, CURRENT_TERMS_VERSION);
+    assert_eq!(accept_status, StatusCode::NO_CONTENT);
+    assert!(pending_after_accept.is_null());
+    // O aceite antigo continua lá: o histórico é a prova, não pode ser sobrescrito.
+    assert_eq!(versions, vec!["antiga", CURRENT_TERMS_VERSION]);
 }

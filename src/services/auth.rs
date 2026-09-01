@@ -28,6 +28,10 @@ use crate::{
         SESSION_COOKIE_NAME, SESSION_REDIS_PREFIX, SESSION_TOKEN_LENGTH, SESSION_TTL_SECONDS,
         USER_SESSIONS_REDIS_PREFIX,
     },
+    services::{
+        access_log::{LoginMethod, record_login},
+        terms::record_acceptance,
+    },
     startup::{AppState, RedisPool},
     telemetry::spawn_blocking_with_tracing,
     utils::{
@@ -351,15 +355,29 @@ pub async fn login(
 ) -> Result<NewSession, LoginError> {
     let mut tx = pool.begin().await.map_err(db_err)?;
 
-    let user_id = match login_type {
+    let (user_id, method, is_new_account) = match login_type {
         LoginType::Standard(creds) => {
             let user = validate_credentials(creds, &mut tx).await?;
-            user.id
+            (user.id, LoginMethod::Password, false)
         }
-        LoginType::Google(info) => resolve_google_user(info, &mut tx).await?,
+        LoginType::Google(info) => {
+            let (user_id, created) = resolve_google_user(info, &mut tx).await?;
+            (user_id, LoginMethod::Google, created)
+        }
     };
 
     update_last_login(&user_id, &mut tx).await?;
+    record_login(&mut tx, &user_id, method, &meta)
+        .await
+        .map_err(db_err)?;
+
+    // Cadastro pelo Google não tem checkbox: o aceite se apoia no aviso exibido
+    // acima do botão, e fica registrado na criação da conta.
+    if is_new_account {
+        record_acceptance(&mut tx, &user_id, &meta)
+            .await
+            .map_err(db_err)?;
+    }
 
     tx.commit().await.map_err(db_err)?;
 
@@ -382,10 +400,12 @@ fn account_conflict(message: &str, email: &str) -> LoginError {
 }
 
 #[tracing::instrument(name = "Resolve o usuário do Google", skip_all)]
+/// Devolve o id e se a conta acabou de ser criada, porque só a conta nova
+/// registra o aceite dos termos.
 pub async fn resolve_google_user(
     info: GoogleUserInfo,
     transaction: &mut Transaction<'static, Postgres>,
-) -> Result<Uuid, LoginError> {
+) -> Result<(Uuid, bool), LoginError> {
     let user_by_id = sqlx::query!(
         r#"
         SELECT
@@ -452,7 +472,7 @@ pub async fn resolve_google_user(
             .map_err(e500)?;
         }
 
-        return Ok(user.id);
+        return Ok((user.id, false));
     }
 
     let user_by_email = sqlx::query!(r#"SELECT id FROM auth_user WHERE email = $1"#, info.email)
@@ -487,7 +507,7 @@ pub async fn resolve_google_user(
 
     crate::services::slug::create_user_profile(transaction, &created.id, &info.name).await?;
 
-    Ok(created.id)
+    Ok((created.id, true))
 }
 
 async fn update_last_login(

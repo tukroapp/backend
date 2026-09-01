@@ -2,7 +2,7 @@ use std::{io::Read, sync::Arc};
 
 use actix_multipart::form::{MultipartForm, tempfile::TempFile};
 use actix_web::{
-    HttpResponse, Responder,
+    HttpRequest, HttpResponse, Responder,
     web::{Data, Json, Query},
 };
 use chrono::NaiveDate;
@@ -13,12 +13,13 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    constants::DEFAULT_TIME_ZONE,
+    constants::{CURRENT_TERMS_VERSION, DEFAULT_TIME_ZONE},
     routes::profile::ProfileSummary,
     services::{
         activity::{NewActivity, record_activity},
-        auth::SessionData,
+        auth::{SessionData, SessionMeta},
         storage::{AVATAR_PREFIX, StorageService, public_url_of, sniff_image},
+        terms::record_acceptance,
         visit::recent_visitors,
     },
     startup::RedisPool,
@@ -103,6 +104,9 @@ pub struct MeResponse {
     pub unread_notifications_count: i64,
     /// Mensagens não lidas em todas as conversas não escondidas, para o badge.
     pub unread_messages_count: i64,
+    /// Versão dos termos que ainda falta aceitar, ou `null` se já está em dia.
+    /// O front usa para abrir o aviso de reaceite.
+    pub pending_terms_version: Option<String>,
 }
 
 async fn fetch_me(
@@ -170,12 +174,20 @@ async fn fetch_me(
                 WHERE m.sender_id <> au.id
                   AND m.created_at > cp.last_read_at
                   AND (cp.hidden_at IS NULL OR m.created_at > cp.hidden_at)
-            ) AS "unread_messages_count!"
+            ) AS "unread_messages_count!",
+            (
+                SELECT $2::text
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM terms_acceptance ta
+                    WHERE ta.user_id = au.id AND ta.version = $2
+                )
+            ) AS "pending_terms_version"
         FROM auth_user au
         INNER JOIN user_profile up ON up.user_id = au.id
         WHERE au.id = $1
         "#,
-        user_id
+        user_id,
+        CURRENT_TERMS_VERSION,
     )
     .fetch_one(pool)
     .await
@@ -901,4 +913,34 @@ pub async fn unread(
         messages: row.messages,
         feed: row.feed,
     })))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/me/terms",
+    description = "Registra o aceite da versão em vigor dos termos de uso e da política de privacidade",
+    responses(
+        (status = 204, description = "Aceite registrado"),
+        (status = 401, description = "Não autenticado", body = ApiErrorResponse),
+    ),
+)]
+#[tracing::instrument(name = "Aceita os termos em vigor", skip_all)]
+pub async fn accept_terms(
+    session: SessionData,
+    pool: Data<PgPool>,
+    request: HttpRequest,
+) -> Result<impl Responder, actix_web::Error> {
+    let mut tx = pool.begin().await.map_err(db_err)?;
+
+    record_acceptance(
+        &mut tx,
+        &session.user_id,
+        &SessionMeta::from_http_request(&request),
+    )
+    .await
+    .map_err(db_err)?;
+
+    tx.commit().await.map_err(db_err)?;
+
+    Ok(HttpResponse::NoContent().finish())
 }

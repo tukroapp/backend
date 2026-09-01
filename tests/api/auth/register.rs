@@ -3,6 +3,8 @@ use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
+use tukro_backend::constants::CURRENT_TERMS_VERSION;
+
 use crate::helpers::{TestApp, drop_app, spawn_app};
 
 const SLUG_RE: &str = r"^[a-z0-9]([a-z0-9-]{1,28}[a-z0-9])$";
@@ -13,7 +15,8 @@ async fn register(app: &TestApp, email: &str, name: &str) -> reqwest::Response {
         .json(&json!({
             "email": email,
             "password": "supersecret123",
-            "name": name
+            "name": name,
+            "accepted_terms": true
         }))
         .send()
         .await
@@ -149,4 +152,80 @@ async fn register_symbol_only_name_falls_back_to_valid_slug() {
         re.is_match(&slug),
         "fallback deve satisfazer o CHECK: {slug}"
     );
+}
+
+#[tokio::test]
+async fn register_records_the_terms_acceptance() {
+    // Arrange
+    let app = spawn_app().await;
+    let email = format!("{}@test.com", Uuid::new_v4());
+
+    // Act
+    let response = register(&app, &email, "Fulano de Tal").await;
+    let status = response.status();
+
+    let acceptance = sqlx::query!(
+        r#"
+        SELECT ta.version, ta.ip
+        FROM terms_acceptance ta
+        INNER JOIN auth_user au ON au.id = ta.user_id
+        WHERE au.email = $1
+        "#,
+        email,
+    )
+    .fetch_all(&app.db_pool)
+    .await
+    .expect("Failed to read the terms acceptance");
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(acceptance.len(), 1);
+    assert_eq!(acceptance[0].version, CURRENT_TERMS_VERSION);
+    assert!(acceptance[0].ip.is_some());
+}
+
+#[tokio::test]
+async fn register_without_accepting_the_terms_is_refused() {
+    // Arrange
+    let app = spawn_app().await;
+    let email = format!("{}@test.com", Uuid::new_v4());
+
+    // Act
+    let response = app
+        .api_client
+        .post(format!("{}/api/v1/auth/register", &app.address))
+        .json(&json!({
+            "email": email,
+            "password": "supersecret123",
+            "name": "Fulano de Tal",
+            "accepted_terms": false
+        }))
+        .send()
+        .await
+        .expect("Failed to send register request");
+
+    let status = response.status();
+    let body: serde_json::Value = response.json().await.expect("response not JSON");
+
+    let created = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) AS "count!" FROM auth_user WHERE email = $1"#,
+        email,
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to count users");
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body["error"]["accepted_terms"][0]["code"],
+        "terms_not_accepted"
+    );
+    assert_eq!(created, 0);
 }

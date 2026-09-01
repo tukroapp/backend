@@ -152,7 +152,9 @@ pub async fn register_and_login_unverified(app: &TestApp, name: &str) -> Registe
     let response = app
         .api_client
         .post(format!("{}/api/v1/auth/register", &app.address))
-        .json(&json!({ "email": email, "password": password, "name": name }))
+        .json(
+            &json!({ "email": email, "password": password, "name": name, "accepted_terms": true }),
+        )
         .send()
         .await
         .expect("Failed to register");

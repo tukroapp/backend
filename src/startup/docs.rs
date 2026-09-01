@@ -35,6 +35,7 @@ use crate::routes::{
         me::visitor,
         me::unread,
         me::birthday,
+        me::accept_terms,
 
         // Feed
         feed::list,

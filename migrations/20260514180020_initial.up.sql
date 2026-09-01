@@ -31,6 +31,11 @@ CREATE TYPE token_type AS ENUM(
     'password_reset'
 );
 
+CREATE TYPE login_method AS ENUM(
+    'password',
+    'google'
+);
+
 CREATE TYPE account_status AS ENUM(
     'active',
     'suspended',
@@ -270,6 +275,36 @@ WHERE
 CREATE INDEX idx_verification_expiry ON verification_token(expires_at);
 
 CREATE INDEX idx_verification_user_recent ON verification_token(user_id, created_at DESC);
+
+-- Registro de acesso do art. 15 do Marco Civil: um login por linha, seis meses.
+-- Sobrevive à anonimização da conta, então `user_id` não é chave estrangeira.
+CREATE TABLE access_log(
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL,
+    method login_method NOT NULL,
+    ip TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_access_log_user ON access_log(user_id, created_at DESC);
+
+CREATE INDEX idx_access_log_created_at ON access_log(created_at);
+
+-- Prova do aceite dos termos e da política de privacidade, publicados em par sob
+-- uma versão só. Append-only: um aceite não se corrige, e o histórico é o que
+-- responde "qual texto essa conta aceitou quando". Sobrevive à anonimização,
+-- então `user_id` não é chave estrangeira.
+CREATE TABLE terms_acceptance(
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuidv7(),
+    user_id UUID NOT NULL,
+    version TEXT NOT NULL,
+    ip TEXT,
+    user_agent TEXT,
+    accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_terms_acceptance_user ON terms_acceptance(user_id, accepted_at DESC);
 
 CREATE TABLE email_queue(
     id BIGSERIAL PRIMARY KEY,

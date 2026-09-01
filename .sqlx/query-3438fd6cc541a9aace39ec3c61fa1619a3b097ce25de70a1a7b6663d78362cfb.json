@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO access_log (user_id, method, ip, user_agent)\n        VALUES ($1, $2, $3, $4)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "login_method",
+            "kind": {
+              "Enum": [
+                "password",
+                "google"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3438fd6cc541a9aace39ec3c61fa1619a3b097ce25de70a1a7b6663d78362cfb"
+}

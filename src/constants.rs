@@ -10,6 +10,11 @@ pub const USER_SESSIONS_REDIS_PREFIX: &str = "user_sessions:";
 
 pub const SESSION_TOKEN_LENGTH: usize = 48;
 
+/// Data de publicação dos termos e da política de privacidade em vigor. Subir o
+/// texto sem subir isso aqui deixa todo mundo aceito numa versão que não existe
+/// mais, então as duas coisas andam juntas.
+pub const CURRENT_TERMS_VERSION: &str = "2026-09-01";
+
 pub const EMAIL_BATCH_SIZE: i64 = 10;
 pub const EMAIL_MAX_CONCURRENT: usize = 4;
 pub const EMAIL_POLL_INTERVAL: Duration = Duration::from_secs(10);

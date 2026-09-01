@@ -311,7 +311,7 @@ async fn registering_queues_the_verification_email() {
     let response = app
         .api_client
         .post(format!("{}/api/v1/auth/register", &app.address))
-        .json(&json!({ "email": email, "password": "supersecret123", "name": "Novato" }))
+        .json(&json!({ "email": email, "password": "supersecret123", "name": "Novato", "accepted_terms": true }))
         .send()
         .await
         .expect("Failed to register");

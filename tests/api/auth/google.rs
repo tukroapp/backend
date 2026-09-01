@@ -1,6 +1,6 @@
 use crate::helpers::{TestApp, TestUser, drop_app, spawn_app};
 use serde_json::json;
-use tukro_backend::constants::SESSION_COOKIE_NAME;
+use tukro_backend::constants::{CURRENT_TERMS_VERSION, SESSION_COOKIE_NAME};
 use tukro_backend::services::auth::AccountStatus;
 use uuid::Uuid;
 use wiremock::{
@@ -444,4 +444,58 @@ async fn google_login_reactivates_deactivated_account() {
         AccountStatus::Active,
         "The account should have been reactivated"
     );
+}
+
+#[tokio::test]
+async fn a_brand_new_google_account_records_the_terms_acceptance() {
+    // Arrange
+    let app = spawn_app().await;
+    let email = format!("{}@gmail.com", Uuid::new_v4());
+
+    mount_token_success(&app).await;
+    mount_userinfo(
+        &app,
+        json!({
+            "id": Uuid::new_v4().to_string(),
+            "email": email,
+            "name": "Recém-chegado",
+            "picture": "mock_picture_url"
+        }),
+    )
+    .await;
+
+    let state = initiate_flow(&app).await;
+
+    // Act
+    let callback = app
+        .api_client
+        .get(format!(
+            "{}/api/v1/auth/google/callback?code=mock_code&state={}",
+            app.address, state
+        ))
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    let callback_status = callback.status();
+
+    let versions = sqlx::query_scalar!(
+        r#"
+        SELECT ta.version
+        FROM terms_acceptance ta
+        INNER JOIN auth_user au ON au.id = ta.user_id
+        WHERE au.email = $1
+        "#,
+        email,
+    )
+    .fetch_all(&app.db_pool)
+    .await
+    .expect("Failed to read the terms acceptance");
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(callback_status.as_u16(), 302);
+    assert_eq!(versions, vec![CURRENT_TERMS_VERSION]);
 }

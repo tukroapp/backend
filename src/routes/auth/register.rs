@@ -1,16 +1,16 @@
 use actix_web::{
-    HttpResponse, Responder,
+    HttpRequest, HttpResponse, Responder,
     web::{Data, Json},
 };
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use utoipa::ToSchema;
-use validator::Validate;
+use validator::{Validate, ValidationError};
 
 use crate::{
     routes::auth::send_verification_email::queue_verification_email,
-    services::slug::create_user_profile,
+    services::{auth::SessionMeta, slug::create_user_profile, terms::record_acceptance},
     startup::AppState,
     telemetry::spawn_blocking_with_tracing,
     utils::{ApiErrorResponse, ApiResponse, compute_hash, db_err, e500},
@@ -36,6 +36,7 @@ pub struct RegisterResponse {
 pub async fn post(
     pool: Data<PgPool>,
     app_state: Data<AppState>,
+    request: HttpRequest,
     payload: Json<RegisterRequest>,
 ) -> Result<impl Responder, actix_web::Error> {
     if let Err(e) = payload.validate() {
@@ -81,6 +82,10 @@ pub async fn post(
 
     let slug = create_user_profile(&mut tx, &user_id, &payload.name).await?;
 
+    record_acceptance(&mut tx, &user_id, &SessionMeta::from_http_request(&request))
+        .await
+        .map_err(db_err)?;
+
     tx.commit().await.map_err(db_err)?;
 
     // A conta já existe; falhar aqui só custaria o e-mail automático, e o
@@ -114,4 +119,21 @@ pub struct RegisterRequest {
     #[validate(length(min = 1, max = 80, message = "O nome deve ter entre 1 e 80 caracteres"))]
     #[schema(example = "Fulano de Tal")]
     pub name: String,
+
+    /// Aceite dos termos e da política de privacidade. Só `true` cadastra, e o
+    /// campo é obrigatório de propósito: ausente é recusa, não omissão.
+    #[validate(custom(function = "must_accept"))]
+    #[schema(example = true)]
+    pub accepted_terms: bool,
+}
+
+fn must_accept(accepted: &bool) -> Result<(), ValidationError> {
+    if *accepted {
+        return Ok(());
+    }
+
+    let mut error = ValidationError::new("terms_not_accepted");
+    error.message = Some("É preciso aceitar os termos de uso e a política de privacidade.".into());
+
+    Err(error)
 }

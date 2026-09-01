@@ -139,6 +139,7 @@ fn me_urls(limits: &RateLimits<'_>) -> impl HttpServiceFactory + use<> {
                 .route(put().to(album::put))
                 .route(delete().to(album::delete)),
         )
+        .service(resource("/terms").route(post().to(me::accept_terms)))
         .service(resource("/visitor").route(get().to(me::visitor)))
         .service(resource("/unread").route(get().to(me::unread)))
         .service(resource("/birthday").route(get().to(me::birthday)))
