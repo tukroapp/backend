@@ -58,6 +58,28 @@ async fn upload(
         .expect("Failed to upload media")
 }
 
+async fn profile_of(
+    app: &TestApp,
+    slug: &str,
+    viewer: Option<&RegisteredUser>,
+) -> serde_json::Value {
+    let mut request = app
+        .api_client
+        .get(format!("{}/api/v1/profile/{}", &app.address, slug));
+
+    if let Some(viewer) = viewer {
+        request = request.header(reqwest::header::AUTHORIZATION, viewer.auth_header());
+    }
+
+    request
+        .send()
+        .await
+        .expect("Failed to read the profile")
+        .json()
+        .await
+        .expect("profile response not JSON")
+}
+
 async fn delete_media(app: &TestApp, user: &RegisteredUser, id: &str) -> reqwest::Response {
     app.api_client
         .delete(format!("{}/api/v1/me/media/{}", &app.address, id))
@@ -322,4 +344,43 @@ async fn the_album_follows_the_profile_privacy() {
     assert_eq!(anonymous.status(), StatusCode::FORBIDDEN);
     assert_eq!(owner_status, StatusCode::OK);
     assert_eq!(owner_body["results"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn the_profile_counts_media_and_hides_the_counts_from_a_closed_album() {
+    // Arrange
+    let app = spawn_app().await;
+    let owner = register_and_login(&app, "Dono").await;
+    let stranger = register_and_login(&app, "Estranho").await;
+
+    upload(&app, &owner, "uma.png", png_bytes()).await;
+    upload(&app, &owner, "outra.png", png_bytes()).await;
+    upload(&app, &owner, "video.mp4", mp4_bytes()).await;
+
+    let public = profile_of(&app, &owner.slug, Some(&stranger)).await;
+    let public_photos = public["results"]["photos_count"].clone();
+    let public_videos = public["results"]["videos_count"].clone();
+
+    // O perfil fechado esconde o álbum, e a contagem tem que sumir junto.
+    app.api_client
+        .put(format!("{}/api/v1/me", &app.address))
+        .header(reqwest::header::AUTHORIZATION, owner.auth_header())
+        .json(&json!({ "name": "Dono", "profile_visibility": "nobody" }))
+        .send()
+        .await
+        .expect("Failed to close the profile");
+
+    let hidden = profile_of(&app, &owner.slug, Some(&stranger)).await;
+    let own = profile_of(&app, &owner.slug, Some(&owner)).await;
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(public_photos, 2);
+    assert_eq!(public_videos, 1);
+    assert!(hidden["results"]["photos_count"].is_null());
+    assert!(hidden["results"]["videos_count"].is_null());
+    assert_eq!(own["results"]["photos_count"], 2);
+    assert_eq!(own["results"]["videos_count"], 1);
 }

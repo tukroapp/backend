@@ -155,6 +155,11 @@ pub struct ProfileResponse {
     /// A avaliação de quem está olhando, para preencher o formulário. `null`
     /// para anônimo, para o dono do perfil e para quem ainda não avaliou.
     pub my_rating: Option<MyRating>,
+    /// Total de fotos do perfil. `null` quando o álbum está fechado para quem
+    /// está olhando, mesma regra do `GET /profile/{slug}/media`.
+    pub photos_count: Option<i64>,
+    /// Total de vídeos do perfil, com a mesma regra de visibilidade das fotos.
+    pub videos_count: Option<i64>,
     /// Total de fãs do perfil.
     pub fans_count: i64,
     /// `true` quando quem está olhando já é fã desse perfil.
@@ -367,6 +372,18 @@ pub async fn get(
                   AND t.deleted_at IS NULL
             ) AS "testimonials_count!",
             (
+                SELECT COUNT(*) FROM user_media m
+                WHERE m.user_id = user_profile.user_id
+                  AND m.kind = 'photo'
+                  AND m.deleted_at IS NULL
+            ) AS "photos_count!",
+            (
+                SELECT COUNT(*) FROM user_media m
+                WHERE m.user_id = user_profile.user_id
+                  AND m.kind = 'video'
+                  AND m.deleted_at IS NULL
+            ) AS "videos_count!",
+            (
                 SELECT COUNT(*) FROM fan
                 INNER JOIN auth_user au ON au.id = fan.fan_id AND au.status = 'active'
                 WHERE fan.idol_id = user_profile.user_id
@@ -500,6 +517,12 @@ pub async fn get(
         can_rate: target.can_rate,
         rating,
         my_rating,
+        photos_count: target
+            .can_view_profile_details
+            .then_some(profile.photos_count),
+        videos_count: target
+            .can_view_profile_details
+            .then_some(profile.videos_count),
         fans_count: profile.fans_count,
         is_fan: target.viewer_is_fan,
         can_be_fan: viewer.is_some_and(|viewer| viewer != target.user_id),
