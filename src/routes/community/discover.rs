@@ -2,7 +2,7 @@ use actix_web::{
     HttpResponse, Responder,
     web::{Data, Query},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -13,15 +13,17 @@ use crate::{
     routes::community::{CommunityCategory, CommunitySummary},
     services::{
         auth::SessionData,
+        cache,
         storage::{StorageService, public_url_of},
     },
+    startup::RedisPool,
     utils::{
         ApiCursorPaginatedResponse, ApiErrorResponse, ApiResponse, CursorPaginationQuery, db_err,
         take_page,
     },
 };
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct CategoryCount {
     pub category: CommunityCategory,
     /// Comunidades ativas nessa categoria.
@@ -46,7 +48,18 @@ pub struct FriendCommunity {
     ),
 )]
 #[tracing::instrument(name = "Índice de categorias", skip_all)]
-pub async fn categories(pool: Data<PgPool>) -> Result<impl Responder, actix_web::Error> {
+pub async fn categories(
+    pool: Data<PgPool>,
+    redis: Data<RedisPool>,
+) -> Result<impl Responder, actix_web::Error> {
+    let redis = redis.get_ref();
+
+    if let Some(cached) =
+        cache::get_json::<Vec<CategoryCount>>(redis, cache::COMMUNITY_CATEGORY_COUNTS).await
+    {
+        return Ok(HttpResponse::Ok().json(ApiResponse::new(cached)));
+    }
+
     let rows = sqlx::query!(
         r#"
         SELECT
@@ -69,6 +82,14 @@ pub async fn categories(pool: Data<PgPool>) -> Result<impl Responder, actix_web:
             count: row.count,
         })
         .collect::<Vec<_>>();
+
+    cache::set_json(
+        redis,
+        cache::COMMUNITY_CATEGORY_COUNTS,
+        &results,
+        cache::CATEGORY_COUNTS_TTL,
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(ApiResponse::new(results)))
 }

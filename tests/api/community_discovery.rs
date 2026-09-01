@@ -1,6 +1,8 @@
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
+use tukro_backend::services::cache;
+
 use crate::friend::befriend;
 use crate::helpers::{RegisteredUser, TestApp, drop_app, register_and_login, spawn_app};
 
@@ -206,6 +208,15 @@ async fn the_category_index_counts_the_communities() {
     create(&app, &owner, "Rock", "musica", false).await;
     create(&app, &owner, "Samba", "musica", false).await;
     create(&app, &owner, "RPG de mesa", "jogos", false).await;
+
+    // O índice é cacheado no Redis por uma chave global, que não é isolada por
+    // banco como o resto do teste: limpa antes de ler para não pegar a contagem
+    // de outra execução.
+    deadpool_redis::redis::cmd("DEL")
+        .arg(cache::COMMUNITY_CATEGORY_COUNTS)
+        .query_async::<()>(&mut app.redis_pool.get().await.unwrap())
+        .await
+        .expect("Failed to clear the category cache");
 
     // Act
     let index = json_of(

@@ -1,6 +1,7 @@
 pub mod account;
 pub mod activity;
 pub mod auth;
+pub mod cache;
 pub mod email;
 pub mod notification;
 pub mod seed;
