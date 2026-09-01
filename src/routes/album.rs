@@ -24,7 +24,7 @@ use crate::{
     },
     utils::{
         ApiCursorPaginatedResponse, ApiErrorResponse, ApiResponse, CursorPaginationQuery, db_err,
-        take_page, unauthorized,
+        take_page,
     },
 };
 
