@@ -92,11 +92,7 @@ pub async fn get(
             c.avatar_url,
             c.category AS "category: CommunityCategory",
             c.is_private,
-            (
-                SELECT COUNT(*) FROM community_member m
-                INNER JOIN auth_user au ON au.id = m.user_id AND au.status = 'active'
-                WHERE m.community_id = c.id
-            ) AS "members_count!"
+            c.members_count
         FROM community_member cm
         INNER JOIN community c ON c.id = cm.community_id
         WHERE cm.user_id = $1

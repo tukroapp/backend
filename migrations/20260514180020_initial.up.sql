@@ -237,6 +237,10 @@ CREATE TABLE user_profile(
     -- visitas dessa pessoa visíveis nos perfis que ela visita. FALSE corta os dois
     -- lados: nenhuma visita dela é registrada e ela não vê a própria lista.
     show_profile_visits BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Contagem desnormalizada dos fãs, mantida por trigger, para a listagem não
+    -- precisar contar os fãs de cada fã só para ordenar por popularidade. Conta
+    -- apenas fãs de contas ativas, como a listagem.
+    fans_count BIGINT NOT NULL DEFAULT 0,
     -- Até onde o usuário já viu o feed. O contador de "novas" no /me/unread conta
     -- o que passou disso.
     feed_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -474,6 +478,41 @@ CREATE TABLE fan(
 
 CREATE INDEX idx_fan_idol ON fan(idol_id, created_at DESC);
 
+-- As contagens desnormalizadas só olham contas ativas, então a virada de status
+-- em `auth_user` também mexe nelas, junto das entradas e saídas. A conta some
+-- por status ('deleted' depois da anonimização), nunca por DELETE: apagar a
+-- linha de `auth_user` levaria as arestas junto sem passar pelo desconto.
+CREATE OR REPLACE FUNCTION bump_fans_count()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE
+            user_profile
+        SET
+            fans_count = fans_count + 1
+        WHERE
+            user_id = NEW.idol_id
+            AND EXISTS (SELECT 1 FROM auth_user WHERE id = NEW.fan_id AND status = 'active');
+        RETURN NEW;
+    END IF;
+    UPDATE
+        user_profile
+    SET
+        fans_count = fans_count - 1
+    WHERE
+        user_id = OLD.idol_id
+        AND EXISTS (SELECT 1 FROM auth_user WHERE id = OLD.fan_id AND status = 'active');
+    RETURN OLD;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_fan_bump_fans_count
+    AFTER INSERT OR DELETE ON fan
+    FOR EACH ROW
+    EXECUTE FUNCTION bump_fans_count();
+
 CREATE TABLE block(
     blocker_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
     blocked_id UUID NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
@@ -573,6 +612,10 @@ CREATE TABLE community(
     -- em 'outros' e a navegação por categoria não teria graça.
     category community_category NOT NULL,
     is_private BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Contagem desnormalizada dos membros, mantida por trigger, pelo mesmo
+    -- motivo do `user_profile.fans_count`: sem ela o índice de descoberta conta
+    -- os membros de toda comunidade antes de cortar a página.
+    members_count BIGINT NOT NULL DEFAULT 0,
     -- Remoção pela moderação. O dono continua excluindo de verdade pelo próprio
     -- endpoint; aqui a comunidade só sai do ar e pode voltar.
     deleted_at TIMESTAMPTZ DEFAULT NULL,
@@ -586,6 +629,11 @@ SELECT
     set_updated_at_for('community');
 
 CREATE INDEX idx_community_name_trgm ON community USING GIN(name gin_trgm_ops);
+
+-- Índice de descoberta ordenado pelos membros, a ordenação mais cara da rota.
+CREATE INDEX idx_community_members ON community(members_count DESC, id DESC)
+WHERE
+    deleted_at IS NULL;
 
 -- Listagem por categoria, da mais nova para a mais antiga.
 CREATE INDEX idx_community_category ON community(category, id DESC)
@@ -601,6 +649,75 @@ CREATE TABLE community_member(
 );
 
 CREATE INDEX idx_community_member_user ON community_member(user_id, joined_at DESC);
+
+CREATE OR REPLACE FUNCTION bump_members_count()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE
+            community
+        SET
+            members_count = members_count + 1
+        WHERE
+            id = NEW.community_id
+            AND EXISTS (SELECT 1 FROM auth_user WHERE id = NEW.user_id AND status = 'active');
+        RETURN NEW;
+    END IF;
+    UPDATE
+        community
+    SET
+        members_count = members_count - 1
+    WHERE
+        id = OLD.community_id
+        AND EXISTS (SELECT 1 FROM auth_user WHERE id = OLD.user_id AND status = 'active');
+    RETURN OLD;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_community_member_bump_members_count
+    AFTER INSERT OR DELETE ON community_member
+    FOR EACH ROW
+    EXECUTE FUNCTION bump_members_count();
+
+-- Suspender, desativar ou reativar uma conta entra e sai das contagens de todos
+-- os ídolos e comunidades daquele usuário de uma vez.
+CREATE OR REPLACE FUNCTION sync_counts_on_status_change()
+    RETURNS TRIGGER
+    AS $$
+DECLARE
+    delta INT := CASE WHEN NEW.status = 'active' THEN 1 ELSE -1 END;
+BEGIN
+    UPDATE
+        user_profile up
+    SET
+        fans_count = up.fans_count + delta
+    FROM
+        fan
+    WHERE
+        fan.fan_id = NEW.id
+        AND up.user_id = fan.idol_id;
+    UPDATE
+        community c
+    SET
+        members_count = c.members_count + delta
+    FROM
+        community_member cm
+    WHERE
+        cm.user_id = NEW.id
+        AND c.id = cm.community_id;
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_auth_user_sync_counts
+    AFTER UPDATE OF status ON auth_user
+    FOR EACH ROW
+    WHEN (OLD.status IS DISTINCT FROM NEW.status
+        AND (OLD.status = 'active' OR NEW.status = 'active'))
+    EXECUTE FUNCTION sync_counts_on_status_change();
 
 CREATE UNIQUE INDEX idx_community_single_owner ON community_member(community_id)
 WHERE

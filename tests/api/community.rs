@@ -852,3 +852,46 @@ async fn the_profile_counts_communities_and_hides_the_count_from_a_closed_profil
     assert!(hidden["results"]["communities_count"].is_null());
     assert_eq!(own["results"]["communities_count"], 2);
 }
+
+#[tokio::test]
+async fn suspending_a_member_drops_it_from_the_denormalized_count() {
+    // Arrange
+    let app = spawn_app().await;
+    let owner = register_and_login(&app, "Dono").await;
+    let member = register_and_login(&app, "Membro").await;
+    let slug = create_community(&app, &owner, "Comunidade", false).await;
+    join(&app, &member, &slug).await;
+
+    let before = json_of(get_community(&app, &slug, Some(&owner)).await).await;
+
+    sqlx::query!(
+        "UPDATE auth_user SET status = 'suspended' WHERE email = $1",
+        member.email
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to suspend the member");
+
+    let suspended = json_of(get_community(&app, &slug, Some(&owner)).await).await;
+
+    // Sair da comunidade também desconta, mesmo com a saída vindo do trigger de
+    // `community_member`.
+    sqlx::query!(
+        "UPDATE auth_user SET status = 'active' WHERE email = $1",
+        member.email
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to reactivate the member");
+    leave(&app, &member, &slug).await;
+
+    let left = json_of(get_community(&app, &slug, Some(&owner)).await).await;
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(before["results"]["members_count"], 2);
+    assert_eq!(suspended["results"]["members_count"], 1);
+    assert_eq!(left["results"]["members_count"], 1);
+}

@@ -169,11 +169,7 @@ pub async fn fetch_detail(
             c.avatar_url,
             c.is_private,
             c.created_at,
-            (
-                SELECT COUNT(*) FROM community_member cm
-                INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'
-                WHERE cm.community_id = c.id
-            ) AS "members_count!",
+            c.members_count,
             (
                 SELECT COUNT(*) FROM community_join_request r
                 WHERE r.community_id = c.id AND r.status = 'pending'

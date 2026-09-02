@@ -76,7 +76,10 @@ async fn stopping_being_a_fan_is_idempotent() {
     assert_eq!(body["results"]["fans_count"], json!(0));
 
     // De novo, sem erro.
-    assert_eq!(stop_fan(&app, &fan, &idol.slug).await.status(), StatusCode::OK);
+    assert_eq!(
+        stop_fan(&app, &fan, &idol.slug).await.status(),
+        StatusCode::OK
+    );
 
     assert_eq!(
         profile(&app, &idol.slug, &fan).await["results"]["is_fan"],
@@ -170,4 +173,183 @@ async fn the_fan_list_is_public_and_paginated() {
     assert!(slugs.contains(&b.slug.as_str()));
 
     drop_app(app).await;
+}
+
+async fn list_fans(app: &TestApp, idol_slug: &str, query: &str) -> Value {
+    let response = app
+        .api_client
+        .get(format!(
+            "{}/api/v1/profile/{}/fan?{}",
+            app.address, idol_slug, query
+        ))
+        .send()
+        .await
+        .expect("Failed to list fans");
+    assert_eq!(response.status(), StatusCode::OK);
+    json_of(response).await
+}
+
+/// Os slugs da listagem, na ordem em que vieram.
+fn slugs_of(body: &Value) -> Vec<String> {
+    body["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|fan| fan["slug"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn the_fan_list_carries_the_fan_date_and_the_fan_own_count() {
+    let app = spawn_app().await;
+    let idol = register_and_login(&app, "Idolo").await;
+    let fan = register_and_login(&app, "Ana").await;
+    let other = register_and_login(&app, "Bia").await;
+
+    become_fan(&app, &fan, &idol.slug).await;
+    // A Ana também tem fã, e é esse número que a lista do ídolo mostra.
+    become_fan(&app, &other, &fan.slug).await;
+
+    let body = list_fans(&app, &idol.slug, "").await;
+
+    drop_app(app).await;
+
+    let listed = &body["results"][0];
+    assert_eq!(listed["slug"], json!(fan.slug));
+    assert_eq!(listed["fans_count"], json!(1));
+    assert!(listed["fan_since"].is_string());
+}
+
+#[tokio::test]
+async fn the_fan_list_filters_by_name_and_sorts_by_date_and_popularity() {
+    let app = spawn_app().await;
+    let idol = register_and_login(&app, "Idolo").await;
+    let first = register_and_login(&app, "Ana Popular").await;
+    let second = register_and_login(&app, "Bia Quieta").await;
+
+    become_fan(&app, &first, &idol.slug).await;
+    become_fan(&app, &second, &idol.slug).await;
+    // Só a Ana tem fã, então ela lidera a ordenação por popularidade.
+    become_fan(&app, &idol, &first.slug).await;
+
+    let newest = list_fans(&app, &idol.slug, "sort=created_at_desc").await;
+    let oldest = list_fans(&app, &idol.slug, "sort=created_at_asc").await;
+    let popular = list_fans(&app, &idol.slug, "sort=fans_desc").await;
+    let unpopular = list_fans(&app, &idol.slug, "sort=fans_asc").await;
+    let filtered = list_fans(&app, &idol.slug, "q=quieta").await;
+
+    let invalid = app
+        .api_client
+        .get(format!(
+            "{}/api/v1/profile/{}/fan?sort=whatever",
+            app.address, idol.slug
+        ))
+        .send()
+        .await
+        .expect("Failed to list fans");
+    let invalid_status = invalid.status();
+    let invalid_body = json_of(invalid).await;
+
+    drop_app(app).await;
+
+    assert_eq!(
+        slugs_of(&newest),
+        vec![second.slug.clone(), first.slug.clone()]
+    );
+    assert_eq!(
+        slugs_of(&oldest),
+        vec![first.slug.clone(), second.slug.clone()]
+    );
+    assert_eq!(
+        slugs_of(&popular),
+        vec![first.slug.clone(), second.slug.clone()]
+    );
+    assert_eq!(
+        slugs_of(&unpopular),
+        vec![second.slug.clone(), first.slug.clone()]
+    );
+    assert_eq!(slugs_of(&filtered), vec![second.slug]);
+    assert_eq!(invalid_status, StatusCode::BAD_REQUEST);
+    assert_eq!(invalid_body["error"]["sort"][0]["code"], "invalid_sort");
+}
+
+#[tokio::test]
+async fn the_fan_list_cursor_walks_every_sort() {
+    let app = spawn_app().await;
+    let idol = register_and_login(&app, "Idolo").await;
+    let a = register_and_login(&app, "Ana").await;
+    let b = register_and_login(&app, "Bia").await;
+    let c = register_and_login(&app, "Cida").await;
+
+    become_fan(&app, &a, &idol.slug).await;
+    become_fan(&app, &b, &idol.slug).await;
+    become_fan(&app, &c, &idol.slug).await;
+    // Popularidades distintas para a ordenação por fãs não empatar.
+    become_fan(&app, &idol, &a.slug).await;
+    become_fan(&app, &b, &a.slug).await;
+    become_fan(&app, &idol, &b.slug).await;
+
+    let mut walked = Vec::new();
+    for sort in ["created_at_desc", "created_at_asc", "fans_desc", "fans_asc"] {
+        let first = list_fans(&app, &idol.slug, &format!("sort={sort}&limit=2")).await;
+        let cursor = first["next_cursor"].as_str().unwrap().to_string();
+        let second = list_fans(
+            &app,
+            &idol.slug,
+            &format!("sort={sort}&limit=2&cursor={cursor}"),
+        )
+        .await;
+
+        let mut page = slugs_of(&first);
+        page.extend(slugs_of(&second));
+        walked.push((page, second["next_cursor"].clone()));
+    }
+
+    drop_app(app).await;
+
+    for (page, next_cursor) in walked {
+        // As duas páginas somam a lista inteira, sem repetir nem pular ninguém.
+        assert_eq!(page.len(), 3);
+        let mut sorted = page.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 3);
+        assert!(next_cursor.is_null());
+    }
+}
+
+#[tokio::test]
+async fn suspending_a_fan_drops_it_from_the_denormalized_count() {
+    let app = spawn_app().await;
+    let idol = register_and_login(&app, "Idolo").await;
+    let fan = register_and_login(&app, "Ana").await;
+
+    become_fan(&app, &fan, &idol.slug).await;
+    let before = json_of(become_fan(&app, &fan, &idol.slug).await).await;
+
+    sqlx::query!(
+        "UPDATE auth_user SET status = 'suspended' WHERE email = $1",
+        fan.email
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to suspend the fan");
+
+    let suspended = profile(&app, &idol.slug, &idol).await;
+
+    sqlx::query!(
+        "UPDATE auth_user SET status = 'active' WHERE email = $1",
+        fan.email
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to reactivate the fan");
+
+    let reactivated = profile(&app, &idol.slug, &idol).await;
+
+    drop_app(app).await;
+
+    assert_eq!(before["results"]["fans_count"], json!(1));
+    assert_eq!(suspended["results"]["fans_count"], json!(0));
+    assert_eq!(reactivated["results"]["fans_count"], json!(1));
 }

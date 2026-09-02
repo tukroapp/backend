@@ -292,7 +292,14 @@ pub async fn with_slug(
         return Ok(conversation_not_found());
     };
 
-    match fetch_summary(pool.get_ref(), storage.as_ref().as_ref(), me, conversation_id).await? {
+    match fetch_summary(
+        pool.get_ref(),
+        storage.as_ref().as_ref(),
+        me,
+        conversation_id,
+    )
+    .await?
+    {
         Some(summary) => Ok(HttpResponse::Ok().json(ApiResponse::new(summary))),
         None => Ok(conversation_not_found()),
     }

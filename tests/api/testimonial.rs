@@ -651,7 +651,10 @@ async fn testimonials_follow_the_profile_privacy() {
     // Perfil público: qualquer um vê.
     let response = app
         .api_client
-        .get(format!("{}/api/v1/profile/{}/testimonial", app.address, alice.slug))
+        .get(format!(
+            "{}/api/v1/profile/{}/testimonial",
+            app.address, alice.slug
+        ))
         .send()
         .await
         .expect("list");
@@ -662,7 +665,10 @@ async fn testimonials_follow_the_profile_privacy() {
     // Estranho (e anônimo): 403.
     let stranger = app
         .api_client
-        .get(format!("{}/api/v1/profile/{}/testimonial", app.address, alice.slug))
+        .get(format!(
+            "{}/api/v1/profile/{}/testimonial",
+            app.address, alice.slug
+        ))
         .header(reqwest::header::AUTHORIZATION, carol.auth_header())
         .send()
         .await
@@ -671,7 +677,10 @@ async fn testimonials_follow_the_profile_privacy() {
 
     let anon = app
         .api_client
-        .get(format!("{}/api/v1/profile/{}/testimonial", app.address, alice.slug))
+        .get(format!(
+            "{}/api/v1/profile/{}/testimonial",
+            app.address, alice.slug
+        ))
         .send()
         .await
         .expect("list");
@@ -680,18 +689,30 @@ async fn testimonials_follow_the_profile_privacy() {
     // Amigo continua vendo.
     let friend = app
         .api_client
-        .get(format!("{}/api/v1/profile/{}/testimonial", app.address, alice.slug))
+        .get(format!(
+            "{}/api/v1/profile/{}/testimonial",
+            app.address, alice.slug
+        ))
         .header(reqwest::header::AUTHORIZATION, bob.auth_header())
         .send()
         .await
         .expect("list");
     assert_eq!(friend.status(), StatusCode::OK);
-    assert_eq!(json_body(friend).await["results"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        json_body(friend).await["results"].as_array().unwrap().len(),
+        1
+    );
 
     // E o contador no perfil some para o estranho.
     let seen_by_stranger = profile_of(&app, &alice.slug, Some(&carol)).await;
-    assert_eq!(seen_by_stranger["results"]["testimonials_visible"], json!(false));
-    assert_eq!(seen_by_stranger["results"]["testimonials_count"], serde_json::Value::Null);
+    assert_eq!(
+        seen_by_stranger["results"]["testimonials_visible"],
+        json!(false)
+    );
+    assert_eq!(
+        seen_by_stranger["results"]["testimonials_count"],
+        serde_json::Value::Null
+    );
 
     drop_app(app).await;
 }

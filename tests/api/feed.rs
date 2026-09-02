@@ -115,7 +115,12 @@ async fn an_idols_activity_needs_a_public_profile() {
     )
     .await;
 
-    assert!(feed(&app, &me).await["results"].as_array().unwrap().is_empty());
+    assert!(
+        feed(&app, &me).await["results"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 
     drop_app(app).await;
 }
@@ -155,7 +160,12 @@ async fn my_own_activity_and_strangers_activity_are_excluded() {
     become_fan(&app, &me, &star.slug).await;
     become_fan(&app, &stranger, &star.slug).await;
 
-    assert!(feed(&app, &me).await["results"].as_array().unwrap().is_empty());
+    assert!(
+        feed(&app, &me).await["results"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 
     drop_app(app).await;
 }
@@ -201,7 +211,12 @@ async fn changing_the_status_shows_up_once() {
     let alice = register_and_login(&app, "Alice").await;
     befriend(&app, &me, &alice).await;
 
-    update_profile(&app, &alice, json!({ "name": "Alice", "status": "de férias!" })).await;
+    update_profile(
+        &app,
+        &alice,
+        json!({ "name": "Alice", "status": "de férias!" }),
+    )
+    .await;
     // Segundo PUT sem mudar o status não gera atividade nova.
     update_profile(
         &app,
@@ -251,7 +266,12 @@ async fn adding_media_shows_up_with_the_file() {
     assert_eq!(items.len(), 1);
     assert_eq!(items[0]["kind"], json!("media_added"));
     assert_eq!(items[0]["media"]["kind"], json!("photo"));
-    assert!(items[0]["media"]["url"].as_str().unwrap().contains("/media/"));
+    assert!(
+        items[0]["media"]["url"]
+            .as_str()
+            .unwrap()
+            .contains("/media/")
+    );
 
     drop_app(app).await;
 }

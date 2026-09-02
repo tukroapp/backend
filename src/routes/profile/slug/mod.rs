@@ -392,11 +392,7 @@ pub async fn get(
                 INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL
                 WHERE cm.user_id = user_profile.user_id
             ) AS "communities_count!",
-            (
-                SELECT COUNT(*) FROM fan
-                INNER JOIN auth_user au ON au.id = fan.fan_id AND au.status = 'active'
-                WHERE fan.idol_id = user_profile.user_id
-            ) AS "fans_count!",
+            fans_count,
             (
                 SELECT COUNT(*) FROM friend f
                 INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'

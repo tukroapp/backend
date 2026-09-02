@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            c.id,\n            c.slug,\n            c.name,\n            c.description,\n            c.avatar_url,\n            c.category AS \"category: CommunityCategory\",\n            c.is_private,\n            (\n                SELECT COUNT(*) FROM community_member m\n                INNER JOIN auth_user au ON au.id = m.user_id AND au.status = 'active'\n                WHERE m.community_id = c.id\n            ) AS \"members_count!\",\n            COUNT(*) AS \"friends_count!\"\n        FROM friend f\n        INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n        INNER JOIN community_member cm ON cm.user_id = f.friend_id\n        INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL\n        WHERE f.user_id = $1\n          -- Comunidade privada não se descobre por fora: ou te convidam, ou não.\n          AND NOT c.is_private\n          AND NOT EXISTS (\n              SELECT 1 FROM community_member mine\n              WHERE mine.user_id = $1 AND mine.community_id = c.id\n          )\n        GROUP BY c.id\n        HAVING (\n            $2::bigint IS NULL\n            OR (COUNT(*), c.id) < ($2::bigint, $3::uuid)\n        )\n        ORDER BY COUNT(*) DESC, c.id DESC\n        LIMIT $4\n        ",
+  "query": "\n        SELECT\n            c.id,\n            c.slug,\n            c.name,\n            c.description,\n            c.avatar_url,\n            c.category AS \"category: CommunityCategory\",\n            c.is_private,\n            c.members_count,\n            COUNT(*) AS \"friends_count!\"\n        FROM friend f\n        INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n        INNER JOIN community_member cm ON cm.user_id = f.friend_id\n        INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL\n        WHERE f.user_id = $1\n          -- Comunidade privada não se descobre por fora: ou te convidam, ou não.\n          AND NOT c.is_private\n          AND NOT EXISTS (\n              SELECT 1 FROM community_member mine\n              WHERE mine.user_id = $1 AND mine.community_id = c.id\n          )\n        GROUP BY c.id\n        HAVING (\n            $2::bigint IS NULL\n            OR (COUNT(*), c.id) < ($2::bigint, $3::uuid)\n        )\n        ORDER BY COUNT(*) DESC, c.id DESC\n        LIMIT $4\n        ",
   "describe": {
     "columns": [
       {
@@ -111,9 +111,14 @@
       },
       {
         "ordinal": 7,
-        "name": "members_count!",
+        "name": "members_count",
         "type_info": "Int8",
-        "origin": "Expression"
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "members_count"
+          }
+        }
       },
       {
         "ordinal": 8,
@@ -138,9 +143,9 @@
       true,
       false,
       false,
-      null,
+      false,
       null
     ]
   },
-  "hash": "faa72871600d3aea016dd019eece5851ce24aa5508d44d4fd7ea50fe7630ac9a"
+  "hash": "06fb92ded6b17b17525138cee631e4fe008a8ed96ec81efd54f4d74913680842"
 }

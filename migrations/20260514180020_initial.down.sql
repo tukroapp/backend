@@ -1,3 +1,9 @@
+DROP FUNCTION IF EXISTS sync_counts_on_status_change;
+
+DROP FUNCTION IF EXISTS bump_members_count;
+
+DROP FUNCTION IF EXISTS bump_fans_count;
+
 DROP TABLE IF EXISTS terms_acceptance;
 
 DROP TABLE IF EXISTS access_log;

@@ -66,11 +66,13 @@ async fn set_role(app: &TestApp, slug: &str, user: &RegisteredUser, role: &str) 
 }
 
 async fn expire_poll(app: &TestApp, id: &str) {
-    sqlx::query("UPDATE community_poll SET closes_at = NOW() - INTERVAL '1 hour' WHERE id = $1::uuid")
-        .bind(id)
-        .execute(&app.db_pool)
-        .await
-        .expect("Failed to expire poll");
+    sqlx::query(
+        "UPDATE community_poll SET closes_at = NOW() - INTERVAL '1 hour' WHERE id = $1::uuid",
+    )
+    .bind(id)
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to expire poll");
 }
 
 async fn create_poll(
@@ -181,7 +183,9 @@ async fn owner_and_admin_create_polls_but_plain_members_and_outsiders_cannot() {
         StatusCode::FORBIDDEN
     );
     assert_eq!(
-        create_poll(&app, None, &slug, default_poll()).await.status(),
+        create_poll(&app, None, &slug, default_poll())
+            .await
+            .status(),
         StatusCode::UNAUTHORIZED
     );
 
@@ -262,10 +266,7 @@ async fn results_are_hidden_until_the_viewer_votes() {
     assert_eq!(after["results"]["results_visible"], json!(true));
     assert_eq!(after["results"]["total_votes"], json!(1));
     assert_eq!(after["results"]["options"][0]["votes"], json!(1));
-    assert_eq!(
-        after["results"]["my_choices"],
-        json!([option_id(&poll, 0)])
-    );
+    assert_eq!(after["results"]["my_choices"], json!([option_id(&poll, 0)]));
 
     drop_app(app).await;
 }
@@ -551,9 +552,9 @@ async fn author_and_moderator_delete_poll_but_others_cannot() {
     join(&app, &admin, &slug).await;
     set_role(&app, &slug, &admin, "admin").await;
 
-    let poll = json_of(create_poll(&app, Some(&admin), &slug, default_poll()).await).await
-        ["results"]
-        .clone();
+    let poll =
+        json_of(create_poll(&app, Some(&admin), &slug, default_poll()).await).await["results"]
+            .clone();
     let id = poll["id"].as_str().unwrap().to_string();
 
     let by_stranger = app

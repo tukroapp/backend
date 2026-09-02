@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            c.id,\n            c.slug,\n            c.name,\n            c.description,\n            c.avatar_url,\n            c.category AS \"category: CommunityCategory\",\n            c.is_private,\n            (\n                SELECT COUNT(*) FROM community_member m\n                INNER JOIN auth_user au ON au.id = m.user_id AND au.status = 'active'\n                WHERE m.community_id = c.id\n            ) AS \"members_count!\"\n        FROM community_member cm\n        INNER JOIN community c ON c.id = cm.community_id\n        WHERE cm.user_id = $1\n          AND c.deleted_at IS NULL\n          AND ($2::uuid IS NULL OR c.id < $2::uuid)\n          AND (\n              $4::uuid IS NULL\n              OR EXISTS (\n                  SELECT 1 FROM community_member mine\n                  WHERE mine.user_id = $4::uuid AND mine.community_id = c.id\n              )\n          )\n        ORDER BY c.id DESC\n        LIMIT $3\n        ",
+  "query": "\n        SELECT\n            c.id,\n            c.slug,\n            c.name,\n            c.description,\n            c.avatar_url,\n            c.category AS \"category: CommunityCategory\",\n            c.is_private,\n            c.members_count,\n            similarity(c.name, $1) AS \"score!\"\n        FROM community c\n        WHERE (c.name % $1 OR c.slug LIKE $1 || '%')\n          AND c.deleted_at IS NULL\n          AND (\n              $2::real IS NULL\n              OR (similarity(c.name, $1), c.id) < ($2::real, $3::uuid)\n          )\n        ORDER BY similarity(c.name, $1) DESC, c.id DESC\n        LIMIT $4\n        ",
   "describe": {
     "columns": [
       {
@@ -111,17 +111,28 @@
       },
       {
         "ordinal": 7,
-        "name": "members_count!",
+        "name": "members_count",
         "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "members_count"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "score!",
+        "type_info": "Float4",
         "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": [
+        "Text",
+        "Float4",
         "Uuid",
-        "Uuid",
-        "Int8",
-        "Uuid"
+        "Int8"
       ]
     },
     "nullable": [
@@ -132,8 +143,9 @@
       true,
       false,
       false,
+      false,
       null
     ]
   },
-  "hash": "545f1a934adb334325940ae946f1c5007355e15c6f3af7fc21bc55b6d52a2976"
+  "hash": "ad6a0dfa8eb70121fb0271baf5ba77564622f7aa4e9dbfc75c6c73bafc6e2c92"
 }

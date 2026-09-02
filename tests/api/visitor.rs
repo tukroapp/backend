@@ -42,7 +42,10 @@ async fn a_logged_in_visitor_shows_up_in_the_visitor_list() {
     assert_eq!(body["results"]["count_30d"], serde_json::json!(1));
     let recent = body["results"]["recent"].as_array().unwrap();
     assert_eq!(recent.len(), 1);
-    assert_eq!(recent[0]["profile"]["slug"], serde_json::json!(visitor.slug));
+    assert_eq!(
+        recent[0]["profile"]["slug"],
+        serde_json::json!(visitor.slug)
+    );
     assert!(recent[0]["visited_at"].is_string());
 
     drop_app(app).await;

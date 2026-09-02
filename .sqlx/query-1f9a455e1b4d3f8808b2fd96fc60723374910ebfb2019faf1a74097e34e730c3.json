@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            slug, name, avatar_url, status, bio, city, birthdate, created_at,\n            relationship_status AS \"relationship_status: RelationshipStatus\",\n            country, state, languages, interests, who_i_want_to_meet,\n            occupation, company, education, music, movies, books, tv_shows,\n            foods, sports, pets, fashion_style,\n            -- As contagens ignoram quem não está ativo, senão o número não bate\n            -- com a listagem correspondente, que também esconde essa gente.\n            (\n                SELECT COUNT(*) FROM friend f\n                INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n                WHERE f.user_id = user_profile.user_id\n            ) AS \"friends_count!\",\n            (\n                SELECT COUNT(*) FROM scrap s\n                INNER JOIN auth_user au ON au.id = s.author_id AND au.status = 'active'\n                WHERE s.profile_id = user_profile.user_id\n                  AND s.parent_id IS NULL\n                  AND s.deleted_at IS NULL\n            ) AS \"scraps_count!\",\n            (\n                SELECT COUNT(*) FROM testimonial t\n                INNER JOIN auth_user au ON au.id = t.author_id AND au.status = 'active'\n                WHERE t.profile_id = user_profile.user_id\n                  AND t.status = 'accepted'\n                  AND t.deleted_at IS NULL\n            ) AS \"testimonials_count!\",\n            (\n                SELECT COUNT(*) FROM user_media m\n                WHERE m.user_id = user_profile.user_id\n                  AND m.kind = 'photo'\n                  AND m.deleted_at IS NULL\n            ) AS \"photos_count!\",\n            (\n                SELECT COUNT(*) FROM user_media m\n                WHERE m.user_id = user_profile.user_id\n                  AND m.kind = 'video'\n                  AND m.deleted_at IS NULL\n            ) AS \"videos_count!\",\n            (\n                SELECT COUNT(*) FROM community_member cm\n                INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL\n                WHERE cm.user_id = user_profile.user_id\n            ) AS \"communities_count!\",\n            (\n                SELECT COUNT(*) FROM fan\n                INNER JOIN auth_user au ON au.id = fan.fan_id AND au.status = 'active'\n                WHERE fan.idol_id = user_profile.user_id\n            ) AS \"fans_count!\",\n            (\n                SELECT COUNT(*) FROM friend f\n                INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n                WHERE f.user_id = user_profile.user_id\n                  AND EXISTS (\n                      SELECT 1 FROM friend mine\n                      WHERE mine.user_id = $2::uuid AND mine.friend_id = f.friend_id\n                  )\n            ) AS \"mutual_friends_count!\",\n            (\n                SELECT COUNT(*) FROM community_member cm\n                INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL\n                WHERE cm.user_id = user_profile.user_id\n                  AND EXISTS (\n                      SELECT 1 FROM community_member mine\n                      WHERE mine.user_id = $2::uuid AND mine.community_id = cm.community_id\n                  )\n            ) AS \"mutual_communities_count!\"\n        FROM user_profile\n        WHERE user_id = $1\n        ",
+  "query": "\n        SELECT\n            slug, name, avatar_url, status, bio, city, birthdate, created_at,\n            relationship_status AS \"relationship_status: RelationshipStatus\",\n            country, state, languages, interests, who_i_want_to_meet,\n            occupation, company, education, music, movies, books, tv_shows,\n            foods, sports, pets, fashion_style,\n            -- As contagens ignoram quem não está ativo, senão o número não bate\n            -- com a listagem correspondente, que também esconde essa gente.\n            (\n                SELECT COUNT(*) FROM friend f\n                INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n                WHERE f.user_id = user_profile.user_id\n            ) AS \"friends_count!\",\n            (\n                SELECT COUNT(*) FROM scrap s\n                INNER JOIN auth_user au ON au.id = s.author_id AND au.status = 'active'\n                WHERE s.profile_id = user_profile.user_id\n                  AND s.parent_id IS NULL\n                  AND s.deleted_at IS NULL\n            ) AS \"scraps_count!\",\n            (\n                SELECT COUNT(*) FROM testimonial t\n                INNER JOIN auth_user au ON au.id = t.author_id AND au.status = 'active'\n                WHERE t.profile_id = user_profile.user_id\n                  AND t.status = 'accepted'\n                  AND t.deleted_at IS NULL\n            ) AS \"testimonials_count!\",\n            (\n                SELECT COUNT(*) FROM user_media m\n                WHERE m.user_id = user_profile.user_id\n                  AND m.kind = 'photo'\n                  AND m.deleted_at IS NULL\n            ) AS \"photos_count!\",\n            (\n                SELECT COUNT(*) FROM user_media m\n                WHERE m.user_id = user_profile.user_id\n                  AND m.kind = 'video'\n                  AND m.deleted_at IS NULL\n            ) AS \"videos_count!\",\n            (\n                SELECT COUNT(*) FROM community_member cm\n                INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL\n                WHERE cm.user_id = user_profile.user_id\n            ) AS \"communities_count!\",\n            fans_count,\n            (\n                SELECT COUNT(*) FROM friend f\n                INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'\n                WHERE f.user_id = user_profile.user_id\n                  AND EXISTS (\n                      SELECT 1 FROM friend mine\n                      WHERE mine.user_id = $2::uuid AND mine.friend_id = f.friend_id\n                  )\n            ) AS \"mutual_friends_count!\",\n            (\n                SELECT COUNT(*) FROM community_member cm\n                INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL\n                WHERE cm.user_id = user_profile.user_id\n                  AND EXISTS (\n                      SELECT 1 FROM community_member mine\n                      WHERE mine.user_id = $2::uuid AND mine.community_id = cm.community_id\n                  )\n            ) AS \"mutual_communities_count!\"\n        FROM user_profile\n        WHERE user_id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -333,9 +333,14 @@
       },
       {
         "ordinal": 31,
-        "name": "fans_count!",
+        "name": "fans_count",
         "type_info": "Int8",
-        "origin": "Expression"
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "fans_count"
+          }
+        }
       },
       {
         "ordinal": 32,
@@ -388,10 +393,10 @@
       null,
       null,
       null,
-      null,
+      false,
       null,
       null
     ]
   },
-  "hash": "bda867064f2e934d53c7f2522bd4373d6d178c2f7be2067297611a3af9d5e810"
+  "hash": "1f9a455e1b4d3f8808b2fd96fc60723374910ebfb2019faf1a74097e34e730c3"
 }

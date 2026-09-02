@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT fans_count FROM user_profile WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fans_count",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "user_profile",
+            "name": "fans_count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "de5c22453713c798e0bda56bfa93cb96c8ba5596e637312d274eec40ac942339"
+}

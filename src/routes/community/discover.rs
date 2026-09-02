@@ -134,11 +134,7 @@ pub async fn from_friends(
             c.avatar_url,
             c.category AS "category: CommunityCategory",
             c.is_private,
-            (
-                SELECT COUNT(*) FROM community_member m
-                INNER JOIN auth_user au ON au.id = m.user_id AND au.status = 'active'
-                WHERE m.community_id = c.id
-            ) AS "members_count!",
+            c.members_count,
             COUNT(*) AS "friends_count!"
         FROM friend f
         INNER JOIN auth_user au ON au.id = f.friend_id AND au.status = 'active'

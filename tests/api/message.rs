@@ -37,9 +37,17 @@ async fn befriend(app: &TestApp, a: &RegisteredUser, b: &RegisteredUser) {
     .expect("Failed to befriend");
 }
 
-async fn send(app: &TestApp, from: &RegisteredUser, to_slug: &str, body: &str) -> reqwest::Response {
+async fn send(
+    app: &TestApp,
+    from: &RegisteredUser,
+    to_slug: &str,
+    body: &str,
+) -> reqwest::Response {
     app.api_client
-        .post(format!("{}/api/v1/profile/{}/message", app.address, to_slug))
+        .post(format!(
+            "{}/api/v1/profile/{}/message",
+            app.address, to_slug
+        ))
         .header(reqwest::header::AUTHORIZATION, from.auth_header())
         .json(&json!({ "body": body }))
         .send()
@@ -59,7 +67,11 @@ async fn inbox(app: &TestApp, user: &RegisteredUser) -> Value {
     json_of(response).await
 }
 
-async fn conversation_messages(app: &TestApp, user: &RegisteredUser, id: &str) -> reqwest::Response {
+async fn conversation_messages(
+    app: &TestApp,
+    user: &RegisteredUser,
+    id: &str,
+) -> reqwest::Response {
     app.api_client
         .get(format!(
             "{}/api/v1/me/conversation/{}/message",
@@ -74,7 +86,10 @@ async fn conversation_messages(app: &TestApp, user: &RegisteredUser, id: &str) -
 async fn mark_read(app: &TestApp, user: &RegisteredUser, id: &str) {
     let response = app
         .api_client
-        .post(format!("{}/api/v1/me/conversation/{}/read", app.address, id))
+        .post(format!(
+            "{}/api/v1/me/conversation/{}/read",
+            app.address, id
+        ))
         .header(reqwest::header::AUTHORIZATION, user.auth_header())
         .send()
         .await
@@ -105,7 +120,10 @@ async fn sending_creates_a_conversation_seen_by_both_sides() {
     assert_eq!(response.status(), StatusCode::CREATED);
     let sent = json_of(response).await;
     assert_eq!(sent["results"]["from_me"], json!(true));
-    let conversation_id = sent["results"]["conversation_id"].as_str().unwrap().to_string();
+    let conversation_id = sent["results"]["conversation_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let bob_inbox = inbox(&app, &bob).await;
     let convs = bob_inbox["results"].as_array().unwrap();
@@ -118,7 +136,10 @@ async fn sending_creates_a_conversation_seen_by_both_sides() {
 
     let alice_inbox = inbox(&app, &alice).await;
     assert_eq!(alice_inbox["results"][0]["unread_count"], json!(0));
-    assert_eq!(alice_inbox["results"][0]["last_message"]["from_me"], json!(true));
+    assert_eq!(
+        alice_inbox["results"][0]["last_message"]["from_me"],
+        json!(true)
+    );
 
     assert_eq!(unread(&app, &bob).await["results"]["messages"], json!(1));
     assert_eq!(unread(&app, &alice).await["results"]["messages"], json!(0));
@@ -153,7 +174,10 @@ async fn cannot_message_yourself_or_without_a_session() {
 
     let anon = app
         .api_client
-        .post(format!("{}/api/v1/profile/{}/message", app.address, alice.slug))
+        .post(format!(
+            "{}/api/v1/profile/{}/message",
+            app.address, alice.slug
+        ))
         .json(&json!({ "body": "oi" }))
         .send()
         .await
@@ -204,10 +228,16 @@ async fn reading_is_explicit_and_fetching_messages_has_no_side_effect() {
     assert_eq!(messages["results"].as_array().unwrap().len(), 2);
     // Ordem: mais nova primeiro.
     assert_eq!(messages["results"][0]["body"], json!("segunda"));
-    assert_eq!(inbox(&app, &bob).await["results"][0]["unread_count"], json!(2));
+    assert_eq!(
+        inbox(&app, &bob).await["results"][0]["unread_count"],
+        json!(2)
+    );
 
     mark_read(&app, &bob, &id).await;
-    assert_eq!(inbox(&app, &bob).await["results"][0]["unread_count"], json!(0));
+    assert_eq!(
+        inbox(&app, &bob).await["results"][0]["unread_count"],
+        json!(0)
+    );
     assert_eq!(unread(&app, &bob).await["results"]["messages"], json!(0));
 
     drop_app(app).await;
@@ -274,12 +304,20 @@ async fn hiding_a_conversation_removes_it_until_a_new_message_arrives() {
         .await
         .expect("hide");
     assert_eq!(hide.status(), StatusCode::NO_CONTENT);
-    assert!(inbox(&app, &bob).await["results"].as_array().unwrap().is_empty());
+    assert!(
+        inbox(&app, &bob).await["results"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 
     send(&app, &alice, &bob.slug, "voltei").await;
     let convs = inbox(&app, &bob).await;
     assert_eq!(convs["results"].as_array().unwrap().len(), 1);
-    assert_eq!(convs["results"][0]["last_message"]["preview"], json!("voltei"));
+    assert_eq!(
+        convs["results"][0]["last_message"]["preview"],
+        json!("voltei")
+    );
 
     drop_app(app).await;
 }
@@ -292,11 +330,11 @@ async fn a_non_participant_cannot_read_a_conversation() {
     let mallory = register_and_login(&app, "Mallory").await;
     open_messages(&app, &bob).await;
 
-    let id = json_of(send(&app, &alice, &bob.slug, "segredo").await).await["results"]
-        ["conversation_id"]
-        .as_str()
-        .unwrap()
-        .to_string();
+    let id =
+        json_of(send(&app, &alice, &bob.slug, "segredo").await).await["results"]["conversation_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
 
     let response = conversation_messages(&app, &mallory, &id).await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -320,7 +358,10 @@ async fn a_reply_lands_in_the_same_conversation() {
 
     let messages = json_of(conversation_messages(&app, &alice, &id).await).await;
     assert_eq!(messages["results"].as_array().unwrap().len(), 2);
-    assert_eq!(inbox(&app, &alice).await["results"][0]["unread_count"], json!(1));
+    assert_eq!(
+        inbox(&app, &alice).await["results"][0]["unread_count"],
+        json!(1)
+    );
 
     drop_app(app).await;
 }
@@ -352,7 +393,10 @@ async fn me_exposes_message_receive_and_unread_count() {
         .send()
         .await
         .expect("me");
-    assert_eq!(json_of(me).await["results"]["unread_messages_count"], json!(1));
+    assert_eq!(
+        json_of(me).await["results"]["unread_messages_count"],
+        json!(1)
+    );
 
     drop_app(app).await;
 }

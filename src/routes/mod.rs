@@ -1,6 +1,6 @@
 pub mod account;
-pub mod album;
 pub mod admin;
+pub mod album;
 pub mod auth;
 pub mod block;
 pub mod community;

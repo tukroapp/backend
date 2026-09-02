@@ -186,11 +186,7 @@ async fn search_communities(
             c.avatar_url,
             c.category AS "category: CommunityCategory",
             c.is_private,
-            (
-                SELECT COUNT(*) FROM community_member cm
-                INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'
-                WHERE cm.community_id = c.id
-            ) AS "members_count!",
+            c.members_count,
             similarity(c.name, $1) AS "score!"
         FROM community c
         WHERE (c.name % $1 OR c.slug LIKE $1 || '%')
@@ -285,11 +281,7 @@ async fn list_communities(
                 c.avatar_url,
                 c.category,
                 c.is_private,
-                (
-                    SELECT COUNT(*) FROM community_member cm
-                    INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'
-                    WHERE cm.community_id = c.id
-                ) AS members_count
+                c.members_count
             FROM community c
             WHERE c.deleted_at IS NULL
         "#,

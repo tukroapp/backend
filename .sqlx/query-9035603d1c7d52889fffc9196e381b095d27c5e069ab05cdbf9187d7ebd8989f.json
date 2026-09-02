@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            c.slug,\n            c.name,\n            c.description,\n            c.avatar_url,\n            c.is_private,\n            c.created_at,\n            (\n                SELECT COUNT(*) FROM community_member cm\n                INNER JOIN auth_user au ON au.id = cm.user_id AND au.status = 'active'\n                WHERE cm.community_id = c.id\n            ) AS \"members_count!\",\n            (\n                SELECT COUNT(*) FROM community_join_request r\n                WHERE r.community_id = c.id AND r.status = 'pending'\n            ) AS \"pending_requests_count!\"\n        FROM community c\n        WHERE c.id = $1\n        ",
+  "query": "\n        SELECT\n            c.slug,\n            c.name,\n            c.description,\n            c.avatar_url,\n            c.is_private,\n            c.created_at,\n            c.members_count,\n            (\n                SELECT COUNT(*) FROM community_join_request r\n                WHERE r.community_id = c.id AND r.status = 'pending'\n            ) AS \"pending_requests_count!\"\n        FROM community c\n        WHERE c.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -71,9 +71,14 @@
       },
       {
         "ordinal": 6,
-        "name": "members_count!",
+        "name": "members_count",
         "type_info": "Int8",
-        "origin": "Expression"
+        "origin": {
+          "Table": {
+            "table": "community",
+            "name": "members_count"
+          }
+        }
       },
       {
         "ordinal": 7,
@@ -94,9 +99,9 @@
       true,
       false,
       false,
-      null,
+      false,
       null
     ]
   },
-  "hash": "7c706a2cd6100ec915965947f0ccb69f871b06953a68ca06f6d52879f2033049"
+  "hash": "9035603d1c7d52889fffc9196e381b095d27c5e069ab05cdbf9187d7ebd8989f"
 }
