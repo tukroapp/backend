@@ -160,6 +160,10 @@ pub struct ProfileResponse {
     pub photos_count: Option<i64>,
     /// Total de vídeos do perfil, com a mesma regra de visibilidade das fotos.
     pub videos_count: Option<i64>,
+    /// Total de comunidades das quais o perfil participa. `null` quando a lista
+    /// está fechada para quem está olhando, mesma regra do
+    /// `GET /profile/{slug}/community`.
+    pub communities_count: Option<i64>,
     /// Total de fãs do perfil.
     pub fans_count: i64,
     /// `true` quando quem está olhando já é fã desse perfil.
@@ -384,6 +388,11 @@ pub async fn get(
                   AND m.deleted_at IS NULL
             ) AS "videos_count!",
             (
+                SELECT COUNT(*) FROM community_member cm
+                INNER JOIN community c ON c.id = cm.community_id AND c.deleted_at IS NULL
+                WHERE cm.user_id = user_profile.user_id
+            ) AS "communities_count!",
+            (
                 SELECT COUNT(*) FROM fan
                 INNER JOIN auth_user au ON au.id = fan.fan_id AND au.status = 'active'
                 WHERE fan.idol_id = user_profile.user_id
@@ -523,6 +532,9 @@ pub async fn get(
         videos_count: target
             .can_view_profile_details
             .then_some(profile.videos_count),
+        communities_count: target
+            .can_view_profile_details
+            .then_some(profile.communities_count),
         fans_count: profile.fans_count,
         is_fan: target.viewer_is_fan,
         can_be_fan: viewer.is_some_and(|viewer| viewer != target.user_id),

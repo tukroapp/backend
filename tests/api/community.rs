@@ -794,3 +794,61 @@ async fn accepting_over_the_community_limit_keeps_the_request_pending() {
     );
     assert_eq!(still_pending["results"].as_array().unwrap().len(), 1);
 }
+
+async fn profile_of(
+    app: &TestApp,
+    slug: &str,
+    viewer: Option<&RegisteredUser>,
+) -> serde_json::Value {
+    let mut request = app
+        .api_client
+        .get(format!("{}/api/v1/profile/{}", &app.address, slug));
+
+    if let Some(viewer) = viewer {
+        request = request.header(reqwest::header::AUTHORIZATION, viewer.auth_header());
+    }
+
+    request
+        .send()
+        .await
+        .expect("Failed to read the profile")
+        .json()
+        .await
+        .expect("profile response not JSON")
+}
+
+#[tokio::test]
+async fn the_profile_counts_communities_and_hides_the_count_from_a_closed_profile() {
+    // Arrange
+    let app = spawn_app().await;
+    let owner = register_and_login(&app, "Dono").await;
+    let stranger = register_and_login(&app, "Estranho").await;
+
+    // O dono entra como criador nas duas, e a segunda é privada para mostrar
+    // que a contagem não depende da visibilidade da comunidade.
+    create_community(&app, &owner, "Aberta", false).await;
+    create_community(&app, &owner, "Fechada", true).await;
+
+    let public = profile_of(&app, &owner.slug, Some(&stranger)).await;
+    let public_count = public["results"]["communities_count"].clone();
+
+    // O perfil fechado esconde a lista de comunidades, e a contagem some junto.
+    app.api_client
+        .put(format!("{}/api/v1/me", &app.address))
+        .header(reqwest::header::AUTHORIZATION, owner.auth_header())
+        .json(&json!({ "name": "Dono", "profile_visibility": "nobody" }))
+        .send()
+        .await
+        .expect("Failed to close the profile");
+
+    let hidden = profile_of(&app, &owner.slug, Some(&stranger)).await;
+    let own = profile_of(&app, &owner.slug, Some(&owner)).await;
+
+    // Tear down
+    drop_app(app).await;
+
+    // Assert
+    assert_eq!(public_count, 2);
+    assert!(hidden["results"]["communities_count"].is_null());
+    assert_eq!(own["results"]["communities_count"], 2);
+}
