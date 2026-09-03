@@ -30,10 +30,18 @@ impl Application {
         let listener = TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();
 
-        let current_dir = env::current_dir().expect("Falha ao determinar diretório atual");
-        let media_dir = current_dir.join("media");
+        let is_dev =
+            cfg!(test) || configuration.application.environment == Environment::Development;
 
-        if !media_dir.exists() {
+        let media_dir = if configuration.application.media_dir.is_absolute() {
+            configuration.application.media_dir.clone()
+        } else {
+            env::current_dir()?.join(&configuration.application.media_dir)
+        };
+
+        // Em produção o upload vai para o bucket e nada é escrito aqui, então o
+        // diretório não precisa existir.
+        if is_dev && !media_dir.exists() {
             tracing::info!(
                 "Diretório de uploads não encontrado, criando em: {:?}",
                 media_dir.to_str()
@@ -41,9 +49,6 @@ impl Application {
 
             fs::create_dir_all(&media_dir).await?;
         }
-
-        let is_dev =
-            cfg!(test) || configuration.application.environment == Environment::Development;
 
         let app_state = AppState {
             environment: configuration.application.environment,

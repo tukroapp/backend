@@ -159,7 +159,6 @@ pub fn run(config: RunConfig) -> Result<Server, std::io::Error> {
                 permissive: &permissive_rate_limit_config,
                 auth: &auth_rate_limit_config,
             }))
-            .service(Files::new("/media", &media_dir).use_last_modified(true))
             .default_service(web::route().to(not_found_service))
             .app_data(multipart_parse_config(MAX_UPLOAD_SIZE_BYTES))
             .app_data(json_parse_config())
@@ -171,7 +170,10 @@ pub fn run(config: RunConfig) -> Result<Server, std::io::Error> {
             .app_data(storage_data.clone());
 
         if app_state.environment == Environment::Development {
-            app.service(docs::swagger_ui())
+            // Só em dev os uploads ficam no disco; em produção quem serve é o
+            // bucket, e o diretório nem existe.
+            app.service(Files::new("/media", &media_dir).use_last_modified(true))
+                .service(docs::swagger_ui())
         } else {
             app
         }

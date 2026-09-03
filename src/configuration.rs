@@ -4,6 +4,7 @@ use dotenvy::var;
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
+use std::path::PathBuf;
 
 #[derive(Deserialize, Clone, Display, Debug, PartialEq, Eq)]
 pub enum Environment {
@@ -37,6 +38,10 @@ pub struct ApplicationSettings {
     pub s3_secret_access_key: String,
     pub s3_bucket: String,
     pub s3_public_base_url: String,
+    /// Onde ficam os uploads em dev. Caminho relativo conta a partir do
+    /// diretório de trabalho. Em produção os arquivos vão para o bucket e isso
+    /// só serve para o mount estático /media.
+    pub media_dir: PathBuf,
 }
 
 #[derive(Deserialize, Clone)]
@@ -155,6 +160,9 @@ pub fn get_configuration() -> Result<Settings, anyhow::Error> {
             .context("S3_SECRET_ACCESS_KEY must be set")?,
         s3_bucket: var("S3_BUCKET").context("S3_BUCKET must be set")?,
         s3_public_base_url: var("S3_PUBLIC_BASE_URL").context("S3_PUBLIC_BASE_URL must be set")?,
+        media_dir: var("APP_MEDIA_DIR")
+            .unwrap_or_else(|_| "media".to_string())
+            .into(),
     };
 
     let database_settings = DatabaseSettings {
