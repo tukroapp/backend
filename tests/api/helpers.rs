@@ -83,13 +83,40 @@ impl Drop for TestApp {
 }
 
 impl TestApp {
-    /// Sobe a aplicação de novo contra o mesmo banco, sem servir requisições: é
-    /// o que um segundo deploy faria, e o que o seed do admin precisa aguentar.
+    /// Cria um administrador direto no banco, com o e-mail já verificado. O
+    /// `createsuperuser` do CLI faz o mesmo em produção, mas os testes não
+    /// chamam o binário.
     #[allow(dead_code)]
-    pub async fn boot_again(&self) {
-        Application::build(self.configuration.clone())
-            .await
-            .expect("Failed to build the application again");
+    pub async fn create_admin(&self, email: &str, password: &str) -> Uuid {
+        let user_id = Uuid::now_v7();
+
+        sqlx::query!(
+            r#"
+            INSERT INTO auth_user (id, email, password_hash, is_superuser, is_email_verified)
+            VALUES ($1, $2, $3, TRUE, TRUE)
+            "#,
+            user_id,
+            email,
+            hash_password(password),
+        )
+        .execute(&self.db_pool)
+        .await
+        .expect("Failed to create the admin");
+
+        sqlx::query!(
+            r#"
+            INSERT INTO user_profile (user_id, slug, name)
+            VALUES ($1, $2, $3)
+            "#,
+            user_id,
+            format!("admin-{}", &Uuid::new_v4().simple().to_string()[..8]),
+            "Administrador",
+        )
+        .execute(&self.db_pool)
+        .await
+        .expect("Failed to create the admin profile");
+
+        user_id
     }
 
     pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
@@ -196,15 +223,7 @@ impl TestUser {
     }
 
     pub async fn store(&self, pool: &PgPool) {
-        let salt = SaltString::generate(&mut OsRng);
-        let password_hash = Argon2::new(
-            argon2::Algorithm::Argon2id,
-            argon2::Version::V0x13,
-            Params::new(15000, 2, 1, None).unwrap(),
-        )
-        .hash_password(self.password.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
+        let password_hash = hash_password(&self.password);
 
         sqlx::query!(
             r#"
@@ -335,7 +354,6 @@ pub async fn spawn_app() -> TestApp {
         c.application.google_user_info_uri = format!("{}/userinfo", mock_google_server.uri());
         c.application.google_client_id = "test_id".to_string();
         c.application.google_client_secret = "test_secret".to_string();
-        c.application.admin_password_first_access = Some("primeiro-acesso-do-teste".to_string());
         c
     };
 
@@ -359,7 +377,7 @@ pub async fn spawn_app() -> TestApp {
         port: application_port,
         address: format!("http://localhost:{}", application_port),
         db_pool: get_connection_pool(&configuration.database),
-        redis_pool: get_redis_pool(&configuration.redis),
+        redis_pool: get_redis_pool(&configuration.redis).expect("Failed to create the Redis pool"),
         api_client: client,
         test_user: TestUser::generate(),
         database_name,
@@ -408,6 +426,18 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to migrate the database.");
     connection_pool
+}
+
+fn hash_password(password: &str) -> String {
+    let salt = SaltString::generate(&mut OsRng);
+    Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        Params::new(15000, 2, 1, None).unwrap(),
+    )
+    .hash_password(password.as_bytes(), &salt)
+    .unwrap()
+    .to_string()
 }
 
 #[allow(dead_code)]

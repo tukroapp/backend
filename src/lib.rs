@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod configuration;
 pub mod constants;
 pub mod middlewares;

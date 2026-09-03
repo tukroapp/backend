@@ -1,4 +1,5 @@
 mod account;
+mod admin_account;
 mod admin_moderation;
 mod admin_report;
 mod admin_user;
@@ -24,7 +25,6 @@ mod profile;
 mod rating;
 mod report;
 mod scrap;
-mod seed_admin;
 mod social_edges;
 mod testimonial;
 mod top_friends;

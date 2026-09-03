@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 use validator::{Validate, ValidationError, ValidationErrors};
 
 use crate::{
+    constants::PASSWORD_MIN_LENGTH,
     services::auth::{LoginCredentials, SessionData, delete_other_sessions, validate_credentials},
     startup::RedisPool,
     telemetry::spawn_blocking_with_tracing,
@@ -118,7 +119,7 @@ pub struct ChangePasswordRequest {
     #[schema(example = "minhasenhaantiga123")]
     pub old_password: String,
     #[validate(
-        length(min = 8, message = "A senha deve ter pelo menos 8 caracteres"),
+        length(min = PASSWORD_MIN_LENGTH, message = "A senha deve ter pelo menos 8 caracteres"),
         must_match(
             other = "new_password_confirmation",
             message = "As senhas não coincidem"

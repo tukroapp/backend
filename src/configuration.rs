@@ -37,11 +37,6 @@ pub struct ApplicationSettings {
     pub s3_secret_access_key: String,
     pub s3_bucket: String,
     pub s3_public_base_url: String,
-    /// E-mail do superusuário criado no primeiro boot.
-    pub admin_email: String,
-    /// Senha desse primeiro acesso. Ausente quando o admin já existe e a
-    /// variável saiu do ambiente, que é o estado esperado depois da troca.
-    pub admin_password_first_access: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -160,8 +155,6 @@ pub fn get_configuration() -> Result<Settings, anyhow::Error> {
             .context("S3_SECRET_ACCESS_KEY must be set")?,
         s3_bucket: var("S3_BUCKET").context("S3_BUCKET must be set")?,
         s3_public_base_url: var("S3_PUBLIC_BASE_URL").context("S3_PUBLIC_BASE_URL must be set")?,
-        admin_email: var("ADMIN_EMAIL").unwrap_or_else(|_| "admin@tukro.app".to_string()),
-        admin_password_first_access: var("ADMIN_PASSWORD_FIRST_ACCESS").ok(),
     };
 
     let database_settings = DatabaseSettings {

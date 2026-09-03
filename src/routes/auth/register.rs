@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 use validator::{Validate, ValidationError};
 
 use crate::{
+    constants::PASSWORD_MIN_LENGTH,
     routes::auth::send_verification_email::queue_verification_email,
     services::{auth::SessionMeta, slug::create_user_profile, terms::record_acceptance},
     startup::AppState,
@@ -112,7 +113,7 @@ pub struct RegisterRequest {
     #[schema(example = "novo@example.com")]
     pub email: String,
 
-    #[validate(length(min = 8, message = "A senha deve ter pelo menos 8 caracteres"))]
+    #[validate(length(min = PASSWORD_MIN_LENGTH, message = "A senha deve ter pelo menos 8 caracteres"))]
     #[schema(example = "minhasenhasupersegura")]
     pub password: String,
 

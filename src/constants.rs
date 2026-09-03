@@ -10,6 +10,10 @@ pub const USER_SESSIONS_REDIS_PREFIX: &str = "user_sessions:";
 
 pub const SESSION_TOKEN_LENGTH: usize = 48;
 
+/// Tamanho mínimo da senha, valendo no cadastro, na troca, no reset e no
+/// `createsuperuser` do CLI.
+pub const PASSWORD_MIN_LENGTH: u64 = 8;
+
 /// Data de publicação dos termos e da política de privacidade em vigor. Subir o
 /// texto sem subir isso aqui deixa todo mundo aceito numa versão que não existe
 /// mais, então as duas coisas andam juntas.
